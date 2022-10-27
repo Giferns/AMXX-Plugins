@@ -1,0 +1,7 @@
+[ru]
+BDDS__WARN = .:: %i/%i ::.
+BDDS__DONT_SPAM = Колесокрутство - ГРЕХ!
+
+[en]
+BDDS__WARN = .:: %i/%i ::.
+BDDS__DONT_SPAM = Mousewheeling is a SIN!
