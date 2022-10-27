@@ -2,6 +2,8 @@
 	This plugin is designed to block the movement of the player using the duck bind on the mouse wheel
 
 	Данный плагин предназначен для блокировки передвижения игрока с использованием бинда приседания на колесо мыши
+
+	Demo / Демо: https://youtu.be/SEXqsdDTlLo
 */
 
 // NOTE: Based on 'Anti DD Scroll' version '1.0 Fixed' by Empower
