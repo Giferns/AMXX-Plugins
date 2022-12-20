@@ -1,0 +1,21 @@
+[ru]
+AFK__WARN_CENTER = Начните движение!
+AFK__WARN_CHAT = ^3* ^1Вы АФК? Пожалуйста, начните движение!
+AFK__KICK_AFK = Не стойте AFK!
+AFK__SPEC_AFK = Не сидите AFK в наблюдателях!
+AFK__KICK_AFK_ALL = ^4* ^3%n ^1кикнут(а) с сервера (^4AFK^1)
+AFK__YOU_GOT_BOMB = Вы получили бомбу!
+AFK__BOMB_TRANSFERED_TO = Бомба передана игроку %n
+AFK__TRANSFER_TO_SPEC_INFO = ^4* ^3%n ^1отправлен(а) в зрители (^4AFK^1)
+AFK__ARE_YOU_THERE = \yВы здесь?^n^n\r1. \wДа!
+
+[en]
+AFK__WARN_CENTER = Please start moving!
+AFK__WARN_CHAT = ^3* ^1Are you AFK? Please start moving!
+AFK__KICK_AFK = Don't stand AFK!
+AFK__SPEC_AFK = Don't be AFK in spectators!
+AFK__KICK_AFK_ALL = ^4* ^3%n ^1kicked from the server (^4AFK^1)
+AFK__YOU_GOT_BOMB = You got a bomb!
+AFK__BOMB_TRANSFERED_TO = The bomb transferred to %n
+AFK__TRANSFER_TO_SPEC_INFO = ^4* ^3%n ^1transferred to spectators (^4AFK^1)
+AFK__ARE_YOU_THERE = \yAre you here?^n^n\r1. \wYes!
