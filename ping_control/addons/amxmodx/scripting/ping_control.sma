@@ -81,7 +81,7 @@ func_RegCvars() {
 		.bind = g_eCvar[CVAR__NOTICE_PUNISH]
 	);
 
-	bind_cvar_string( "ping_immunity_flag", "y",
+	bind_cvar_string( "ping_immunity_flag", "",
 		.desc = "Флаги иммунитета к наказанию (требуется любой из; ^"^" - выкл.)",
 		.bind = g_eCvar[CVAR__IMMUNITY_FLAG], .maxlen = charsmax(g_eCvar[CVAR__IMMUNITY_FLAG])
 	);
