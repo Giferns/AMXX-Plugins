@@ -1,0 +1,7 @@
+[en]
+PC__KICK_ALL = ^4* ^3%n ^1kicked from the server (^4Ping/Loss^1)
+PC__KICK_INFO = High ping or packet loss
+
+[ru]
+PC__KICK_ALL = ^4* ^3%n ^1кикнут(а) с сервера (^4Пинг/Потери^1)
+PC__KICK_INFO = Высокий пинг или потеря пакетов
