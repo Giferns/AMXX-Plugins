@@ -12,9 +12,12 @@
 /* Changelog:
 	1.0 (22.12.2022) by mx?!:
 		* First release
+
+	1.1 (14.01.2023) by mx?!:
+		* Added cvars 'ping_dec_ping_warns', 'ping_warn_fluctuation', 'ping_max_fluctuation_warns', 'ping_dec_fluctuation_warns', 'ping_average_count'
 */
 
-new const PLUGIN_VERSION[] = "1.0"
+new const PLUGIN_VERSION[] = "1.1"
 
 #include amxmodx
 #include reapi
@@ -31,10 +34,17 @@ enum _:CVAR_ENUM {
 	CVAR__MAX_WARNS,
 	CVAR__BAN_MINS,
 	CVAR__NOTICE_PUNISH,
-	CVAR__IMMUNITY_FLAG[32]
+	CVAR__IMMUNITY_FLAG[32],
+	CVAR__DEC_PING_WARNS,
+	CVAR__WARN_FLUCTUATION,
+	CVAR__MAX_FLUCTUATION_WARNS,
+	CVAR__DEC_FLUCTUATION_WARNS,
+	CVAR__AVERAGE_COUNT
 }
 
-new g_eCvar[CVAR_ENUM], g_iWarns[MAX_PLAYERS + 1]
+new g_eCvar[CVAR_ENUM], g_iPingWarns[MAX_PLAYERS + 1], g_iPingSum[MAX_PLAYERS + 1], g_iPingTests[MAX_PLAYERS + 1]
+new g_iLastPing[MAX_PLAYERS + 1], g_iFluctuationWarns[MAX_PLAYERS + 1], g_iDecFluctCounter[MAX_PLAYERS + 1]
+new g_iDecPingCounter[MAX_PLAYERS + 1]
 
 public plugin_init() {
 	register_plugin("Ping Control", PLUGIN_VERSION, "mx?!")
@@ -63,7 +73,7 @@ func_RegCvars() {
 	);
 
 	bind_cvar_num( "ping_max_warns", "3",
-		.has_min = true, .min_val = 0.0,
+		.has_min = true, .min_val = 1.0,
 		.desc = "Через сколько предупреждений игрок будет наказан",
 		.bind = g_eCvar[CVAR__MAX_WARNS]
 	);
@@ -84,6 +94,32 @@ func_RegCvars() {
 	bind_cvar_string( "ping_immunity_flag", "",
 		.desc = "Флаги иммунитета к наказанию (требуется любой из; ^"^" - выкл.)",
 		.bind = g_eCvar[CVAR__IMMUNITY_FLAG], .maxlen = charsmax(g_eCvar[CVAR__IMMUNITY_FLAG])
+	);
+
+	bind_cvar_num( "ping_dec_ping_warns", "6",
+		.desc = "Уменьшать счётчик предупреждений ping/loss каждые # успешных проверок игрока (0 - не уменьшать)",
+		.bind = g_eCvar[CVAR__DEC_PING_WARNS]
+	);
+
+	bind_cvar_num( "ping_warn_fluctuation", "60",
+		.desc = "Если скачок пинга игрока # или выше, игрок получает предупреждение",
+		.bind = g_eCvar[CVAR__WARN_FLUCTUATION]
+	);
+
+	bind_cvar_num( "ping_max_fluctuation_warns", "5",
+		.has_min = true, .min_val = 0.0,
+		.desc = "Через сколько предупреждений игрок будет наказан (0 - выкл.)",
+		.bind = g_eCvar[CVAR__MAX_FLUCTUATION_WARNS]
+	);
+
+	bind_cvar_num( "ping_dec_fluctuation_warns", "6",
+		.desc = "Уменьшать счётчик скачков пинга каждые # успешных проверок игрока (0 - не уменьшать)",
+		.bind = g_eCvar[CVAR__DEC_FLUCTUATION_WARNS]
+	);
+
+	bind_cvar_num( "ping_average_count", "0",
+		.desc = "Режим подсчёта по среднему пингу (как у h1k3). # - кол-во проверок до начала расчёта (0 - выкл.)",
+		.bind = g_eCvar[CVAR__AVERAGE_COUNT]
 	);
 
 #if defined AUTO_CFG
@@ -110,30 +146,90 @@ public task_Check() {
 
 		get_user_ping(pPlayer, iPing, iLoss)
 
-		if(iPing < g_eCvar[CVAR__WARN_PING] && iLoss < g_eCvar[CVAR__WARN_LOSS]) {
-			if(g_iWarns[pPlayer]) {
-				g_iWarns[pPlayer]--
-			}
-
-			continue
+		if(CheckPing(pPlayer, iPing, iLoss) || CheckFluctuation(pPlayer, iPing)) {
+			PunishPlayer(pPlayer)
 		}
-
-		if(++g_iWarns[pPlayer] < g_eCvar[CVAR__MAX_WARNS]) {
-			continue
-		}
-
-		if(g_eCvar[CVAR__NOTICE_PUNISH]) {
-			client_print_color(0, pPlayer, "%L", LANG_PLAYER, "PC__KICK_ALL", pPlayer)
-		}
-
-		if(g_eCvar[CVAR__BAN_MINS]) {
-			new szIP[MAX_IP_LENGTH]
-			get_user_ip(pPlayer, szIP, charsmax(szIP), .without_port = 1)
-			set_task(1.0, "task_BanIP", g_eCvar[CVAR__BAN_MINS], szIP, sizeof(szIP))
-		}
-
-		server_cmd("kick #%i ^"%L^"", get_user_userid(pPlayer), pPlayer, "PC__KICK_INFO")
 	}
+}
+
+bool:CheckPing(pPlayer, iPing, iLoss) {
+	if(g_eCvar[CVAR__AVERAGE_COUNT]) {
+		return CheckAveragePing(pPlayer, iPing, iLoss)
+	}
+
+	return CheckInstantPing(pPlayer, iPing, iLoss)
+}
+
+bool:CheckAveragePing(pPlayer, iPing, iLoss) {
+	g_iPingSum[pPlayer] += iPing
+
+	if(++g_iPingTests[pPlayer] >= g_eCvar[CVAR__AVERAGE_COUNT]) {
+		if(g_iPingSum[pPlayer] / g_iPingTests[pPlayer] >= g_eCvar[CVAR__WARN_PING]) {
+			return true
+		}
+	}
+
+	if(iLoss < g_eCvar[CVAR__WARN_LOSS]) {
+		DecrementPingWarns(pPlayer)
+		return false
+	}
+
+	return (++g_iPingWarns[pPlayer] >= g_eCvar[CVAR__MAX_WARNS])
+}
+
+bool:CheckInstantPing(pPlayer, iPing, iLoss) {
+	if(iPing < g_eCvar[CVAR__WARN_PING] && iLoss < g_eCvar[CVAR__WARN_LOSS]) {
+		DecrementPingWarns(pPlayer)
+		return false
+	}
+
+	return (++g_iPingWarns[pPlayer] >= g_eCvar[CVAR__MAX_WARNS])
+}
+
+DecrementPingWarns(pPlayer) {
+	if(g_iPingWarns[pPlayer] && g_eCvar[CVAR__DEC_PING_WARNS] && ++g_iDecPingCounter[pPlayer] >= g_eCvar[CVAR__DEC_PING_WARNS]) {
+		g_iPingWarns[pPlayer]--
+		g_iDecPingCounter[pPlayer] = 0
+	}
+}
+
+bool:CheckFluctuation(pPlayer, iPing) {
+	if(!g_eCvar[CVAR__MAX_FLUCTUATION_WARNS]) {
+		return false
+	}
+
+	if(!g_iLastPing[pPlayer]) {
+		g_iLastPing[pPlayer] = iPing
+		return false
+	}
+
+	new iOldLastPing = g_iLastPing[pPlayer]
+	g_iLastPing[pPlayer] = iPing
+
+	if(abs(iOldLastPing - iPing) < g_eCvar[CVAR__WARN_FLUCTUATION]) {
+		if(g_iFluctuationWarns[pPlayer] && g_eCvar[CVAR__DEC_FLUCTUATION_WARNS] && ++g_iDecFluctCounter[pPlayer] >= g_eCvar[CVAR__DEC_FLUCTUATION_WARNS]) {
+			g_iFluctuationWarns[pPlayer]--
+			g_iDecFluctCounter[pPlayer] = 0
+		}
+
+		return false
+	}
+
+	return (++g_iFluctuationWarns[pPlayer] >= g_eCvar[CVAR__MAX_FLUCTUATION_WARNS])
+}
+
+PunishPlayer(pPlayer) {
+	if(g_eCvar[CVAR__NOTICE_PUNISH]) {
+		client_print_color(0, pPlayer, "%L", LANG_PLAYER, "PC__KICK_ALL", pPlayer)
+	}
+
+	if(g_eCvar[CVAR__BAN_MINS]) {
+		new szIP[MAX_IP_LENGTH]
+		get_user_ip(pPlayer, szIP, charsmax(szIP), .without_port = 1)
+		set_task(1.0, "task_BanIP", g_eCvar[CVAR__BAN_MINS], szIP, sizeof(szIP))
+	}
+
+	server_cmd("kick #%i ^"%L^"", get_user_userid(pPlayer), pPlayer, "PC__KICK_INFO")
 }
 
 public task_BanIP(const szIP[], iBanMins) {
@@ -141,7 +237,9 @@ public task_BanIP(const szIP[], iBanMins) {
 }
 
 public client_connect(pPlayer) {
-	g_iWarns[pPlayer] = 0
+	g_iPingWarns[pPlayer] = g_iPingSum[pPlayer] = g_iPingTests[pPlayer] = 0
+	g_iLastPing[pPlayer] = g_iFluctuationWarns[pPlayer] = g_iDecFluctCounter[pPlayer] = 0
+	g_iDecPingCounter[pPlayer] = 0
 }
 
 stock bind_cvar_num(const cvar[], const value[], flags = FCVAR_NONE, const desc[] = "", bool:has_min = false, Float:min_val = 0.0, bool:has_max = false, Float:max_val = 0.0, &bind) {
