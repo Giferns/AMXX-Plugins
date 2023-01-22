@@ -15,9 +15,12 @@
 
 	1.1 (14.01.2023) by mx?!:
 		* Added cvars 'ping_dec_ping_warns', 'ping_warn_fluctuation', 'ping_max_fluctuation_warns', 'ping_dec_fluctuation_warns', 'ping_average_count'
+
+	1.2 (23.01.2023) by mx?!:
+		* Added cvar 'ping_ema_mode' (thx to wopox1337)
 */
 
-new const PLUGIN_VERSION[] = "1.1"
+new const PLUGIN_VERSION[] = "1.2"
 
 #include amxmodx
 #include reapi
@@ -26,6 +29,11 @@ new const PLUGIN_VERSION[] = "1.1"
 //
 // Создавать конфиг с кварами в 'configs/plugins', и запускать его?
 #define AUTO_CFG
+
+// Minimal ping tests count for EMA mode (cvar 'ping_ema_mode')
+//
+// Минимальное кол-во тестов для режима средней скользящей (квар 'ping_ema_mode')
+#define MIN_EMA_TESTS 3
 
 enum _:CVAR_ENUM {
 	Float:CVAR_F__CHECK_INTERVAL,
@@ -39,12 +47,13 @@ enum _:CVAR_ENUM {
 	CVAR__WARN_FLUCTUATION,
 	CVAR__MAX_FLUCTUATION_WARNS,
 	CVAR__DEC_FLUCTUATION_WARNS,
-	CVAR__AVERAGE_COUNT
+	CVAR__AVERAGE_COUNT,
+	CVAR__EMA_MODE
 }
 
 new g_eCvar[CVAR_ENUM], g_iPingWarns[MAX_PLAYERS + 1], g_iPingSum[MAX_PLAYERS + 1], g_iPingTests[MAX_PLAYERS + 1]
 new g_iLastPing[MAX_PLAYERS + 1], g_iFluctuationWarns[MAX_PLAYERS + 1], g_iDecFluctCounter[MAX_PLAYERS + 1]
-new g_iDecPingCounter[MAX_PLAYERS + 1]
+new g_iDecPingCounter[MAX_PLAYERS + 1], Float:g_fPlayerPingEMA[MAX_PLAYERS + 1]
 
 public plugin_init() {
 	register_plugin("Ping Control", PLUGIN_VERSION, "mx?!")
@@ -122,6 +131,14 @@ func_RegCvars() {
 		.bind = g_eCvar[CVAR__AVERAGE_COUNT]
 	);
 
+	// https://gist.github.com/wopox1337/41b7f97e49f3fceb707fba1031edb7d6
+	// https://ru.wikipedia.org/wiki/%D0%A1%D0%BA%D0%BE%D0%BB%D1%8C%D0%B7%D1%8F%D1%89%D0%B0%D1%8F_%D1%81%D1%80%D0%B5%D0%B4%D0%BD%D1%8F%D1%8F
+	// https://youtu.be/3-4CwYfphXc
+	bind_cvar_num( "ping_ema_mode", "0",
+		.desc = "Использовать среднее скользящее для сглаживания скачков при расчёте пинга?",
+		.bind = g_eCvar[CVAR__EMA_MODE]
+	);
+
 #if defined AUTO_CFG
 	AutoExecConfig(/*.name = "PluginName"*/)
 #endif
@@ -144,12 +161,34 @@ public task_Check() {
 			continue
 		}
 
-		get_user_ping(pPlayer, iPing, iLoss)
+		g_iPingTests[pPlayer]++
+
+		GetUserPing(pPlayer, iPing, iLoss)
 
 		if(CheckPing(pPlayer, iPing, iLoss) || CheckFluctuation(pPlayer, iPing)) {
 			PunishPlayer(pPlayer)
 		}
 	}
+}
+
+GetUserPing(pPlayer, &iPing, &iLoss) {
+	get_user_ping(pPlayer, iPing, iLoss)
+
+	if(!g_eCvar[CVAR__EMA_MODE]) {
+		return
+	}
+
+	static Float:fAlpha
+
+	fAlpha = 2.0 / g_iPingTests[pPlayer]
+	g_fPlayerPingEMA[pPlayer] = (fAlpha * iPing) + (1.0 - fAlpha) * g_fPlayerPingEMA[pPlayer]
+
+	if(g_iPingTests[pPlayer] < MIN_EMA_TESTS) {
+		iPing = 0
+		return
+	}
+
+	iPing = floatround(g_fPlayerPingEMA[pPlayer])
 }
 
 bool:CheckPing(pPlayer, iPing, iLoss) {
@@ -163,8 +202,13 @@ bool:CheckPing(pPlayer, iPing, iLoss) {
 bool:CheckAveragePing(pPlayer, iPing, iLoss) {
 	g_iPingSum[pPlayer] += iPing
 
-	if(++g_iPingTests[pPlayer] >= g_eCvar[CVAR__AVERAGE_COUNT]) {
-		if(g_iPingSum[pPlayer] / g_iPingTests[pPlayer] >= g_eCvar[CVAR__WARN_PING]) {
+	if(g_iPingTests[pPlayer] >= g_eCvar[CVAR__AVERAGE_COUNT]) {
+		if(g_eCvar[CVAR__EMA_MODE]) {
+			if(iPing >= g_eCvar[CVAR__WARN_PING]) {
+				return true
+			}
+		}
+		else if(g_iPingSum[pPlayer] / g_iPingTests[pPlayer] >= g_eCvar[CVAR__WARN_PING]) {
 			return true
 		}
 	}
@@ -240,6 +284,7 @@ public client_connect(pPlayer) {
 	g_iPingWarns[pPlayer] = g_iPingSum[pPlayer] = g_iPingTests[pPlayer] = 0
 	g_iLastPing[pPlayer] = g_iFluctuationWarns[pPlayer] = g_iDecFluctCounter[pPlayer] = 0
 	g_iDecPingCounter[pPlayer] = 0
+	g_fPlayerPingEMA[pPlayer] = 1.0
 }
 
 stock bind_cvar_num(const cvar[], const value[], flags = FCVAR_NONE, const desc[] = "", bool:has_min = false, Float:min_val = 0.0, bool:has_max = false, Float:max_val = 0.0, &bind) {
