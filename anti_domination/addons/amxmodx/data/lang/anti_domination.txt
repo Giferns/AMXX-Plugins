@@ -1,0 +1,13 @@
+[ru]
+AD__WINNER_MONEY_INFO = ^4* ^1Вы получаете ^3%i$ ^1вместо ^3%i$^1, так как ваша команда ^4доминирует
+AD__LOOSER_MONEY_INFO = ^4* ^1Вы получаете ^4%i$ ^1вместо ^4%i$^1, так как ваша команда ^3проигрывает
+AD__WINNER_DAMAGE_INFO = ^4* ^1Так как ваша команда ^4доминирует^1, наносимый вами урон будет ^3уменьшен ^1до ^3%i%%
+AD__LOOSER_DAMAGE_INFO = ^4* ^1Так как ваша команда ^3проигрывает^1, наносимый вами урон будет ^4увеличен ^1на ^4%i%%
+AD__BONUS_WEAPON_INFO = ^4* ^1Вы получаете ^4бонусное оружие^1, так как ваша команда ^3проигрывает
+
+[en]
+AD__WINNER_MONEY_INFO = ^4* ^1You get ^3%i$ ^1instead of ^3%i$ ^1because your team is ^4dominating
+AD__LOOSER_MONEY_INFO = ^4* ^1You get ^4%i$ ^1instead of ^4%i$ ^1because your team is ^3losing
+AD__WINNER_DAMAGE_INFO = ^4* ^1Since your team is ^4dominant^1, your damage will be ^3reduced ^1to ^3%i%%
+AD__LOOSER_DAMAGE_INFO = ^4* ^1Since your team is ^3losing^1, your damage will be ^4increased ^1by ^4%i%%
+AD__BONUS_WEAPON_INFO = ^4* ^1You get ^4bonus weapon ^1as your team is ^3losing
