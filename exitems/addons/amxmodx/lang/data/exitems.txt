@@ -1,0 +1,5 @@
+[ru]
+EXITEMS__NO_ACCESS = У вас нет доступа к данному пункту меню!
+EXITEMS__ONLY_BUYZONE = Доступно только в зоне закупки!
+EXITEMS__BUYTIME_OVER = Время на покупку истекло!
+EXITEMS__ALREADY_WEAPON = У Вас уже есть это оружие!
