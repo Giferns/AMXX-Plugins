@@ -37,10 +37,12 @@
 /* Changelog:
 	1.0 (22.02.2023) by mx?!:
 		* First release
+	1.1 (23.02.2023) by mx?!:
+		* Added autoequip feature (cvars 'exitem_mdgl_autoequip_flags', 'exitem_mdgl_autoequip_min_round', and 'exitem_mdgl_autoequip_per_round')
 */
 
 new const PLUGIN_NAME[] = "ExItem: MegaDeagle";
-new const PLUGIN_VERSION[] = "1.0";
+new const PLUGIN_VERSION[] = "1.1";
 
 #pragma semicolon 1
 
@@ -102,7 +104,10 @@ enum _:CVAR_ENUM {
 	CVAR__STRICT_PICKUP,
 	CVAR__BUY_ANYWHERE_SELF,
 	CVAR__BUY_ANYWHERE_ORIG,
-	CVAR__BUY_TIME
+	CVAR__BUY_TIME,
+	CVAR__AUTOEQUIP_FLAGS[32],
+	CVAR__AUTOEQUIP_MIN_ROUND,
+	CVAR__AUTOEQUIP_PER_ROUND
 };
 
 new g_eCvar[CVAR_ENUM];
@@ -124,6 +129,8 @@ public plugin_precache() {
 
 	RegCvars();
 	Precache();
+
+	RegisterHookChain(RG_CBasePlayer_OnSpawnEquip, "CBasePlayer_OnSpawnEquip_Post", true);
 }
 
 RegCvars() {
@@ -148,6 +155,21 @@ RegCvars() {
 		0 - Выкл. покупку^n\
 		1 и более - Время в секундах",
 		.bind = g_eCvar[CVAR__BUY_TIME]
+	);
+
+	bind_cvar_string( "exitem_mdgl_autoequip_flags", "t",
+		.desc = "Флаги автоматической экипировки при спавне. Требуется любой из. (^"^" - для всех)",
+		.bind = g_eCvar[CVAR__AUTOEQUIP_FLAGS], .maxlen = charsmax(g_eCvar[CVAR__AUTOEQUIP_FLAGS])
+	);
+
+	bind_cvar_num( "exitem_mdgl_autoequip_min_round", "0",
+		.desc = "С какого раунда экипировать автоматически (0 - выкл.) ?",
+		.bind = g_eCvar[CVAR__AUTOEQUIP_MIN_ROUND]
+	);
+
+	bind_cvar_num( "exitem_mdgl_autoequip_per_round", "1",
+		.desc = "Поддержка Revive Teammates. Сколько раз за раунд можно автоэкпипироваться (0 - выкл.) ?",
+		.bind = g_eCvar[CVAR__AUTOEQUIP_PER_ROUND]
 	);
 
 	bind_cvar_num_by_name("mp_buy_anywhere", g_eCvar[CVAR__BUY_ANYWHERE_ORIG]);
@@ -238,6 +260,24 @@ public CSGameRules_RestartRound_Pre() {
 			RemoveCustomWeapon(pPlayers[i]);
 		}
 	}
+}
+
+public CBasePlayer_OnSpawnEquip_Post(pPlayer) {
+	if(!is_user_alive(pPlayer) || !g_eCvar[CVAR__AUTOEQUIP_MIN_ROUND] || rg_get_current_round() < g_eCvar[CVAR__AUTOEQUIP_MIN_ROUND]) {
+		return;
+	}
+
+	if(get_member(pPlayer, m_iNumSpawns) > g_eCvar[CVAR__AUTOEQUIP_PER_ROUND]) {
+		return;
+	}
+
+	new bitAcess = read_flags(g_eCvar[CVAR__AUTOEQUIP_FLAGS]);
+
+	if(bitAcess && !( get_user_flags(pPlayer) & bitAcess )) {
+		return;
+	}
+
+	GiveItem(pPlayer);
 }
 
 public client_disconnected(pPlayer) {
@@ -506,6 +546,10 @@ stock bind_cvar_num(const cvar[], const value[], flags = FCVAR_NONE, const desc[
 
 stock bind_cvar_float(const cvar[], const value[], flags = FCVAR_NONE, const desc[] = "", bool:has_min = false, Float:min_val = 0.0, bool:has_max = false, Float:max_val = 0.0, &Float:bind) {
 	bind_pcvar_float(create_cvar(cvar, value, flags, desc, has_min, min_val, has_max, max_val), bind);
+}
+
+stock bind_cvar_string(const cvar[], const value[], flags = FCVAR_NONE, const desc[] = "", bool:has_min = false, Float:min_val = 0.0, bool:has_max = false, Float:max_val = 0.0, bind[], maxlen) {
+	bind_pcvar_string(create_cvar(cvar, value, flags, desc, has_min, min_val, has_max, max_val), bind, maxlen);
 }
 
 stock bind_cvar_num_by_name(const szCvarName[], &iBindVariable) {
