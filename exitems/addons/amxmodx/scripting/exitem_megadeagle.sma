@@ -39,10 +39,12 @@
 		* First release
 	1.1 (23.02.2023) by mx?!:
 		* Added autoequip feature (cvars 'exitem_mdgl_autoequip_flags', 'exitem_mdgl_autoequip_min_round', and 'exitem_mdgl_autoequip_per_round')
+	1.2 (24.02.2023) by mx?!:
+		* Added autoequip by GameCMS privileges
 */
 
 new const PLUGIN_NAME[] = "ExItem: MegaDeagle";
-new const PLUGIN_VERSION[] = "1.1";
+new const PLUGIN_VERSION[] = "1.2";
 
 #pragma semicolon 1
 
@@ -95,6 +97,9 @@ new const SRVCMD_BONUSMENU_RBS[] = "mdgl_bmrbs";
 native bonusmenu_get_user_points(id);
 native bonusmenu_add_user_points(id, points);
 
+// GameCMS
+native Array:cmsapi_get_user_services(const index, const szAuth[] = "", const szService[] = "", serviceID = 0, bool:part = false);
+
 #define INVALID_SLOT -1
 #define rg_get_current_round() (get_member_game(m_iTotalRoundsPlayed) + 1)
 
@@ -114,6 +119,8 @@ new g_eCvar[CVAR_ENUM];
 new g_iWeaponSlot = INVALID_SLOT;
 new any:g_iWeaponId;
 new g_iCooldown[MAX_PLAYERS + 1];
+new bool:g_bByGameCMS[MAX_PLAYERS + 1];
+new g_szGameCmsPriv[8][32], g_iPrivCount;
 
 public plugin_precache() {
 	register_plugin(PLUGIN_NAME, PLUGIN_VERSION, "mx?!");
@@ -126,6 +133,8 @@ public plugin_precache() {
 #endif
 
 	register_srvcmd(SRVCMD_BONUSMENU_RBS, "srvcmd_GiveItem_BonusMenuRBS");
+
+	register_srvcmd("bh_reg_gamecms_mdgl", "srvcmd_GameCMS_RegPrivilege");
 
 	RegCvars();
 	Precache();
@@ -271,17 +280,47 @@ public CBasePlayer_OnSpawnEquip_Post(pPlayer) {
 		return;
 	}
 
-	new bitAcess = read_flags(g_eCvar[CVAR__AUTOEQUIP_FLAGS]);
+	if(!g_bByGameCMS[pPlayer]) {
+		new bitAcess = read_flags(g_eCvar[CVAR__AUTOEQUIP_FLAGS]);
 
-	if(bitAcess && !( get_user_flags(pPlayer) & bitAcess )) {
-		return;
+		if(bitAcess && !( get_user_flags(pPlayer) & bitAcess )) {
+			return;
+		}
 	}
 
 	GiveItem(pPlayer);
 }
 
+public srvcmd_GameCMS_RegPrivilege() {
+	read_args(g_szGameCmsPriv[g_iPrivCount], charsmax(g_szGameCmsPriv[]));
+	remove_quotes(g_szGameCmsPriv[g_iPrivCount]);
+	g_iPrivCount++;
+#if defined DEBUG
+	log_amx("Register gamecms privilege: %s", g_szGameCmsPriv[g_iPrivCount]);
+#endif
+	return PLUGIN_HANDLED;
+}
+
+#define MAX_STRING_LEN	33 // gamecms5.inc
+public OnAPIPostAdminCheck(const id, szFlags[MAX_STRING_LEN]) {
+	if(g_bByGameCMS[id] || !g_iPrivCount || get_user_time(id) > 60) {
+		return;
+	}
+
+	for(new i; i < g_iPrivCount; i++) {
+		if(cmsapi_get_user_services(id, "", g_szGameCmsPriv[i], 0) != Invalid_Array) {
+			g_bByGameCMS[id] = true;
+		#if defined DEBUG
+			log_amx("%n have privilege: %s", id, g_szGameCmsPriv[i]);
+		#endif
+			return;
+		}
+	}
+}
+
 public client_disconnected(pPlayer) {
 	g_iCooldown[pPlayer] = 0;
+	g_bByGameCMS[pPlayer] = false;
 }
 
 RemoveCustomWeapon(pPlayer) {
