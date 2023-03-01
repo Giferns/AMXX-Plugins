@@ -41,10 +41,16 @@
 		* Added autoequip feature (cvars 'exitem_mgren_autoequip_flags', 'exitem_mgren_autoequip_min_round', and 'exitem_mgren_autoequip_per_round')
 	1.2 (24.02.2023) by mx?!:
 		* Added autoequip by GameCMS privileges
+	1.3 (01.03.2023) by mx?!:
+		* Added beamtrail (throw) and beamcylinder (explosion) effects as cvar 'exitem_mgren_effects'
+		* Added autoequip delay feature (csdm stip+equip compatibility) as cvar 'exitem_mgren_autoequip_delay'
+		* Added buy time cooldown as cvar 'exitem_buy_cooldown'
+		* EXITEMS__BUY_COOLDOWN lang key added to dictionary (you need to update data/lang/exitems.txt)
+		* AUTO_CFG functuion replaced by CFG_PATH
 */
 
 new const PLUGIN_NAME[] = "ExItem: MegaGrenade";
-new const PLUGIN_VERSION[] = "1.2";
+new const PLUGIN_VERSION[] = "1.3";
 
 #pragma semicolon 1
 
@@ -53,10 +59,10 @@ new const PLUGIN_VERSION[] = "1.2";
 // Режим отладки. Должен быть закомментирован.
 //#define DEBUG
 
-// Create cvar config in 'configs/plugins' and run it?
+// Config file path inside 'amxmodx/configs'
 //
-// Создавать конфиг с кварами в 'configs/plugins', и запускать его?
-#define AUTO_CFG
+// Путь к конфигу относительно 'amxmodx/configs'
+new const CFG_PATH[] = "plugins/plugin-exitem_megagrenade.cfg";
 
 // Weapon impulse value. Must me unique for each type of custom weapon.
 //
@@ -70,6 +76,11 @@ const WEAPON_IMPULSE = 6776231;
 //new const P_MODEL[] = "models/p_hegrenade.mdl";
 //new const W_MODEL_FLOOR[] = "models/w_hegrenade.mdl";
 //new const W_MODEL_THROW[] = "models/w_hegrenade.mdl";
+
+// Throw and explosion effects support. Comment to disable.
+//
+// Поддержка эффектов броска и взрыва. Закомментируйте для отключения.
+#define EFFECTS_SUPPORT
 
 // Base weapon
 //
@@ -114,9 +125,12 @@ enum _:CVAR_ENUM {
 	CVAR__BUY_ANYWHERE_SELF,
 	CVAR__BUY_ANYWHERE_ORIG,
 	CVAR__BUY_TIME,
+	CVAR__BUY_COOLDOWN,
 	CVAR__AUTOEQUIP_FLAGS[32],
 	CVAR__AUTOEQUIP_MIN_ROUND,
-	CVAR__AUTOEQUIP_PER_ROUND
+	CVAR__AUTOEQUIP_PER_ROUND,
+	CVAR__EFFECTS,
+	Float:CVAR_F__AUTOEQUIP_DELAY
 };
 
 new g_eCvar[CVAR_ENUM];
@@ -125,6 +139,8 @@ new any:g_iWeaponId;
 new g_iCooldown[MAX_PLAYERS + 1];
 new bool:g_bByGameCMS[MAX_PLAYERS + 1];
 new g_szGameCmsPriv[8][32], g_iPrivCount;
+stock g_iTrailSpriteID, g_iCylinderSpriteID;
+new g_iLastBuyTime[MAX_PLAYERS + 1];
 
 public plugin_precache() {
 	register_plugin(PLUGIN_NAME, PLUGIN_VERSION, "mx?!");
@@ -170,6 +186,11 @@ RegCvars() {
 		.bind = g_eCvar[CVAR__BUY_TIME]
 	);
 
+	bind_cvar_num( "exitem_buy_cooldown", "0",
+		.desc = "Для CSDM. Не давать покупать чаще одного раза каждые # секунд (0 - без ограничения)",
+		.bind = g_eCvar[CVAR__BUY_COOLDOWN]
+	);
+
 	bind_cvar_string( "exitem_mgren_autoequip_flags", "t",
 		.desc = "Флаги автоматической экипировки при спавне. Требуется любой из. (^"^" - для всех)",
 		.bind = g_eCvar[CVAR__AUTOEQUIP_FLAGS], .maxlen = charsmax(g_eCvar[CVAR__AUTOEQUIP_FLAGS])
@@ -185,11 +206,18 @@ RegCvars() {
 		.bind = g_eCvar[CVAR__AUTOEQUIP_PER_ROUND]
 	);
 
+	bind_cvar_num( "exitem_mgren_effects", "1",
+		.desc = "Включить встроенные визуальные эффекты (при броске и взрыве) ?",
+		.bind = g_eCvar[CVAR__EFFECTS]
+	);
+
 	bind_cvar_num_by_name("mp_buy_anywhere", g_eCvar[CVAR__BUY_ANYWHERE_ORIG]);
 
-#if defined AUTO_CFG
-	AutoExecConfig(/*.name = "PluginName"*/);
-#endif
+	bind_cvar_float("exitem_mgren_autoequip_delay", "0.0", .desc = "Задержка выдачи (совместимость с автоэквипом CSDM)", .bind = g_eCvar[CVAR_F__AUTOEQUIP_DELAY]);
+
+	new szPath[240];
+	get_localinfo("amxx_configsdir", szPath, charsmax(szPath));
+	server_cmd("exec %s/%s", szPath, CFG_PATH);
 }
 
 Precache() {
@@ -207,6 +235,11 @@ Precache() {
 
 #if defined W_MODEL_THROW
 	precache_model(W_MODEL_THROW);
+#endif
+
+#if defined EFFECTS_SUPPORT
+	g_iTrailSpriteID = precache_model("sprites/smoke.spr");
+	g_iCylinderSpriteID = precache_model("sprites/shockwave.spr");
 #endif
 }
 
@@ -309,7 +342,41 @@ public ThrowHeGrenade_Post(pPlayer, Float:vecStart[3], Float:vecVelocity[3], Flo
 #if defined W_MODEL_THROW
 	engfunc(EngFunc_SetModel, pGrenade, W_MODEL_THROW);
 #endif
+
+#if defined EFFECTS_SUPPORT
+	SetThrowEffects(pGrenade);
+#endif
 }
+
+#if defined EFFECTS_SUPPORT
+	SetThrowEffects(pGrenade) {
+		if(!g_eCvar[CVAR__EFFECTS]) {
+			return;
+		}
+
+		const Float:GLOW_AMT = 90.0;
+
+		static const Float:GLOWSHELL_COLOR[3] = { 200.0, 40.0, 10.0 };
+
+		static const iColor[3] = { 200, 40, 10 };
+
+		set_entvar(pGrenade, var_renderfx, kRenderFxGlowShell);
+		set_entvar(pGrenade, var_renderamt, GLOW_AMT);
+		set_entvar(pGrenade, var_rendercolor, GLOWSHELL_COLOR);
+
+		message_begin(MSG_BROADCAST, SVC_TEMPENTITY);
+		write_byte(TE_BEAMFOLLOW);
+		write_short(pGrenade);
+		write_short(g_iTrailSpriteID);
+		write_byte(10); // life in 0.1's
+		write_byte(3); // line width in 0.1's
+		write_byte(iColor[0]); // r
+		write_byte(iColor[1]); // g
+		write_byte(iColor[2]); // b
+		write_byte(192); // brightness
+		message_end();
+	}
+#endif
 
 public CBasePlayer_TakeDamage_Pre(pVictim, pInflictor, pAttacker, Float:fDamage, bitDamageType) {
 	/*if(g_iWeaponSlot == INVALID_SLOT) {
@@ -326,8 +393,67 @@ public CBasePlayer_TakeDamage_Pre(pVictim, pInflictor, pAttacker, Float:fDamage,
 	SetHookChainArg(4, ATYPE_FLOAT, fDamage * g_eCvar[CVAR_F__DMG_MULTIPLIER]);
 }
 
+#if defined EFFECTS_SUPPORT
+	public CGrenade_ExplodeHeGrenade_Pre(const this, tracehandle, const bitsDamageType) {
+		if(!g_eCvar[CVAR__EFFECTS] || !is_entity(this) || get_entvar(this, var_impulse) != WEAPON_IMPULSE) {
+			return;
+		}
+
+		const Float:CYLINDER_RADIUS = 350.0;
+
+		static const iColor[3] = { 200, 40, 10 };
+
+		new Float:fOrigin[3];
+		get_entvar(this, var_origin, fOrigin);
+
+		UTIL_BeamCylinder(fOrigin, g_iCylinderSpriteID, 1, 5, 30, 1, iColor, 255, 5, CYLINDER_RADIUS);
+	}
+
+	stock UTIL_BeamCylinder(const Float:origin[3], const sprite, const framerate, const life, const width, const amplitude, const color[3], const bright, const speed, const Float:size) {
+		message_begin_f(MSG_BROADCAST, SVC_TEMPENTITY);
+		write_byte(TE_BEAMCYLINDER);
+		write_coord_f(origin[0]);
+		write_coord_f(origin[1]);
+		write_coord_f(origin[2]);
+		write_coord_f(origin[0]);
+		write_coord_f(origin[1]);
+		write_coord_f(origin[2] + size);
+		write_short(sprite);
+		write_byte(0);
+		write_byte(framerate);
+		write_byte(life);
+		write_byte(width);
+		write_byte(amplitude);
+		write_byte(color[0]);
+		write_byte(color[1]);
+		write_byte(color[2]);
+		write_byte(bright);
+		write_byte(speed);
+		message_end();
+	}
+#endif
+
+bool:IsPlayerCanTake(pPlayer) {
+	return (is_user_alive(pPlayer) && g_eCvar[CVAR__AUTOEQUIP_MIN_ROUND] && rg_get_current_round() >= g_eCvar[CVAR__AUTOEQUIP_MIN_ROUND]);
+}
+
 public CBasePlayer_OnSpawnEquip_Post(pPlayer) {
-	if(!is_user_alive(pPlayer) || !g_eCvar[CVAR__AUTOEQUIP_MIN_ROUND] || rg_get_current_round() < g_eCvar[CVAR__AUTOEQUIP_MIN_ROUND]) {
+	remove_task(pPlayer);
+
+	if(!IsPlayerCanTake(pPlayer)) {
+		return;
+	}
+
+	if(!g_eCvar[CVAR_F__AUTOEQUIP_DELAY]) {
+		task_AutoEquip(pPlayer);
+		return;
+	}
+
+	set_task(g_eCvar[CVAR_F__AUTOEQUIP_DELAY], "task_AutoEquip", pPlayer);
+}
+
+public task_AutoEquip(pPlayer) {
+	if(!IsPlayerCanTake(pPlayer)) {
 		return;
 	}
 
@@ -376,6 +502,8 @@ public OnAPIPostAdminCheck(const id, szFlags[MAX_STRING_LEN]) {
 public client_disconnected(pPlayer) {
 	g_iCooldown[pPlayer] = 0;
 	g_bByGameCMS[pPlayer] = false;
+	g_iLastBuyTime[pPlayer] = 0;
+	//remove_task(pPlayer);
 }
 
 RemoveCustomWeapon(pPlayer) {
@@ -428,6 +556,9 @@ GiveItem(pPlayer) {
 		RegisterHookChain(RG_CSGameRules_RestartRound, "CSGameRules_RestartRound_Pre");
 		RegisterHookChain(RG_ThrowHeGrenade, "ThrowHeGrenade_Post", true);
 		RegisterHookChain(RG_CBasePlayer_TakeDamage, "CBasePlayer_TakeDamage_Pre");
+	#if defined EFFECTS_SUPPORT
+		RegisterHookChain(RG_CGrenade_ExplodeHeGrenade, "CGrenade_ExplodeHeGrenade_Pre");
+	#endif
 	}
 
 	//rg_set_user_bpammo(pPlayer, g_iWeaponId, rg_get_iteminfo(pWeapon, ItemInfo_iMaxAmmo1));
@@ -536,6 +667,13 @@ public srvcmd_GiveItem_BonusMenuRBS() {
 		return PLUGIN_HANDLED;
 	}
 
+	new iCoolDownSecs = GetCoolDownSecs(pPlayer);
+
+	if(iCoolDownSecs) {
+		client_print_color(pPlayer, print_team_default, "%l", "EXITEMS__BUY_COOLDOWN", iCoolDownSecs);
+		return PLUGIN_HANDLED;
+	}
+
 	if(g_iCooldown[pPlayer]) {
 		client_print_color(pPlayer, print_team_default, "%l", "BONUSMENU_BLOCKROUNDS", g_iCooldown[pPlayer]);
 		return PLUGIN_HANDLED;
@@ -576,6 +714,7 @@ public srvcmd_GiveItem_BonusMenuRBS() {
 		return PLUGIN_HANDLED;
 	}
 
+	g_iLastBuyTime[pPlayer] = get_systime();
 	g_iCooldown[pPlayer] = read_argv_int(arg_cooldown);
 
 	if(iPrice) {
@@ -583,6 +722,18 @@ public srvcmd_GiveItem_BonusMenuRBS() {
 	}
 
 	return PLUGIN_HANDLED;
+}
+
+GetCoolDownSecs(pPlayer) {
+	new iSysTime = get_systime();
+
+	if(!g_iLastBuyTime[pPlayer]) {
+		return 0;
+	}
+
+	new iElapsed = iSysTime - g_iLastBuyTime[pPlayer];
+
+	return max(0, g_eCvar[CVAR__BUY_COOLDOWN] - iElapsed);
 }
 
 bool:CheckBuyzone(pPlayer) {
