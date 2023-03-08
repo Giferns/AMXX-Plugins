@@ -46,10 +46,12 @@
 		* Added buy time cooldown as cvar 'exitem_mdgl_buy_cooldown'
 		* EXITEMS__BUY_COOLDOWN lang key added to dictionary (you need to update data/lang/exitems.txt)
 		* AUTO_CFG functuion replaced by CFG_PATH
+	1.4 (08.03.2023) by mx?!:
+		* Forward OnAPIPostAdminCheck() replaced by OnAPIAdminConnected()
 */
 
 new const PLUGIN_NAME[] = "ExItem: MegaDeagle";
-new const PLUGIN_VERSION[] = "1.3";
+new const PLUGIN_VERSION[] = "1.4";
 
 #pragma semicolon 1
 
@@ -335,8 +337,7 @@ public srvcmd_GameCMS_RegPrivilege() {
 	return PLUGIN_HANDLED;
 }
 
-#define MAX_STRING_LEN	33 // gamecms5.inc
-public OnAPIPostAdminCheck(const id, szFlags[MAX_STRING_LEN]) {
+public OnAPIAdminConnected(id, const szName[], adminID, Flags) {
 	if(g_bByGameCMS[id] || !g_iPrivCount || get_user_time(id) > 60) {
 		return;
 	}
