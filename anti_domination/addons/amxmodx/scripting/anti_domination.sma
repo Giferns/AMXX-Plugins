@@ -16,9 +16,11 @@
 /* Changelog:
     1.0 (08.02.2023) by mx?!:
         * First release
+	1.1 (05.04.2023) by mx?!:
+		* Added cvar 'ad_equip_delay'
 */
 
-new const PLUGIN_VERSION[] = "1.0"
+new const PLUGIN_VERSION[] = "1.1"
 
 #include <amxmodx>
 #include <reapi>
@@ -45,6 +47,8 @@ new const DISABLED_MAPS[][] = {
 #include <amxmodx>
 #include <reapi>
 
+const TASKID__EQUIP = 1337
+
 enum _:CVAR_ENUM {
 	CVAR__ENABLED,
 	CVAR__WIN_DIFFERENCE,
@@ -55,7 +59,8 @@ enum _:CVAR_ENUM {
 	CVAR__DAMAGE_PERCENTAGE_WINNER,
 	CVAR__BONUS_WEAPON_TT[32],
 	CVAR__BONUS_WEAPON_CT[32],
-	CVAR__EQUIP_EACH_SPAWN
+	CVAR__EQUIP_EACH_SPAWN,
+	Float:CVAR_F__EQUIP_DELAY
 }
 
 new g_eCvar[CVAR_ENUM], HookChain:g_hAddAccount, HookChain:g_hSpawn, HookChain:g_hTakeDamage
@@ -116,6 +121,9 @@ RegCvars() {
 	bind_cvar_num( "ad_equip_each_spawn", "0", .desc = "Экипировать игрока только при его первом спавне за раунд (0), либо каждый спавн (1) (учёт Revive Teammates)",
 		.bind = g_eCvar[CVAR__EQUIP_EACH_SPAWN] );
 
+	bind_cvar_float( "ad_equip_delay", "0.0", .desc = "Задержка выдачи оружия, в секундах (режим совместимости)",
+		.bind = g_eCvar[CVAR_F__EQUIP_DELAY] );
+
 #if defined AUTO_CFG
 	AutoExecConfig(/*.name = "PluginName"*/)
 #endif
@@ -159,6 +167,8 @@ EnableHooks() {
 }
 
 public CSGameRules_RestartRound_Pre() {
+	remove_task(TASKID__EQUIP)
+
 	if(get_member_game(m_bCompleteReset) || !g_eCvar[CVAR__ENABLED]) {
 		g_iBonusRounds = 0
 		DisableHooks()
@@ -250,12 +260,36 @@ public CBasePlayer_Spawn_Post(pPlayer) {
 	new bool:bWinnerTeam = (iTeam == g_iDominationTeam)
 
 	if(!bWinnerTeam) {
-		TryGiveWeapon(pPlayer, iTeam)
+		if(g_eCvar[CVAR_F__EQUIP_DELAY]) {
+			new iData[1]; iData[0] = get_user_userid(pPlayer)
+			set_task(g_eCvar[CVAR_F__EQUIP_DELAY], "task_EquipDelay", TASKID__EQUIP, iData, sizeof(iData))
+		}
+		else {
+			TryGiveWeapon(pPlayer, iTeam)
+		}
 	}
 
 	TryShowDmgInfo(pPlayer, bWinnerTeam)
 
 	return HC_CONTINUE
+}
+
+public task_EquipDelay(iData[1], iTaskID) {
+	new pPlayer = find_player("k", iData[0])
+
+	if(!is_user_alive(pPlayer)) {
+		return
+	}
+
+	new TeamName:iTeam = get_member(pPlayer, m_iTeam)
+
+	if( !(TEAM_SPECTATOR > iTeam > TEAM_UNASSIGNED) ) {
+		return
+	}
+
+	if(iTeam == g_iDominationTeam) {
+		TryGiveWeapon(pPlayer, iTeam)
+	}
 }
 
 TryGiveWeapon(pPlayer, TeamName:iTeam) {
