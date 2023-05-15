@@ -49,10 +49,12 @@
 		* AUTO_CFG functuion replaced by CFG_PATH
 	1.4 (08.03.2023) by mx?!:
 		* Forward OnAPIPostAdminCheck() replaced by OnAPIAdminConnected()
+	1.5 (16.05.2023) by mx?!:
+		* Dupe fix
 */
 
 new const PLUGIN_NAME[] = "ExItem: MegaGrenade";
-new const PLUGIN_VERSION[] = "1.4";
+new const PLUGIN_VERSION[] = "1.5";
 
 #pragma semicolon 1
 
@@ -328,6 +330,9 @@ public ThrowHeGrenade_Post(pPlayer, Float:vecStart[3], Float:vecVelocity[3], Flo
 	if(is_nullent(pWeapon) || !IsCustomWeapon(pWeapon)) {
 		return;
 	}
+
+	// 1.5 dupe fix (mp_nadedrops pickup right after throwing / buying default grenade right after throwing megagrenade)
+	set_entvar(pWeapon, var_impulse, 0);
 
 	new pGrenade = GetHookChainReturn(ATYPE_INTEGER);
 
