@@ -1,0 +1,31 @@
+[ru]
+POLL_CHAT_Q = ^4* ^1Вопрос был '^4%l^1'
+POLL_CHAT_A = ^4* ^1Вы ответили '^4%l^1'
+POLL_BACK = Назад
+POLL_MORE = Дальше
+POLL_EXIT = Выход
+POLL_QUESTION_1 = Вопрос 1
+POLL_ANSWER_1_1 = Ответ 1 - 1
+POLL_ANSWER_1_2 = Ответ 1 - 2
+POLL_QUESTION_2 = Вопрос 2
+POLL_ANSWER_2_1 = Ответ 2 - 1
+POLL_ANSWER_2_2 = Ответ 2 - 2
+POLL_QUESTION_MAP_3 = Вам нравится текущая карта?
+POLL_ANSWER_3_1 = Да
+POLL_ANSWER_3_2 = Нет
+
+[en]
+POLL_CHAT_Q = ^4* ^1The question was '^4%l^1'
+POLL_CHAT_A = ^4* ^1You answered '^4%l^1'
+POLL_BACK = Back
+POLL_MORE = More
+POLL_EXIT = Exit
+POLL_QUESTION_1 = Question 1
+POLL_ANSWER_1_1 = Answer 1 - 1
+POLL_ANSWER_1_2 = Answer 1 - 2
+POLL_QUESTION_2 = Question 2
+POLL_ANSWER_2_1 = Answer 2 - 1
+POLL_ANSWER_2_2 = Answer 2 - 2
+POLL_QUESTION_MAP_3 = Do you like the current map?
+POLL_ANSWER_3_1 = Yes
+POLL_ANSWER_3_2 = No
