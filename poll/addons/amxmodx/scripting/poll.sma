@@ -1,13 +1,15 @@
 /* История обновлений:
 	1.0 (15.07.2023):
 		* Открытый релиз
+	1.1 (16.07.2023):
+		* Фикс компиляции на amxx 190
 */
 
 #include <amxmodx>
 #include <reapi>
 #include <sqlx>
 
-new const PLUGIN_VERSION[] = "1.0" // Based on the idea of a plugin 'Poll' by Nunfy https://dev-cs.ru/resources/574/
+new const PLUGIN_VERSION[] = "1.1" // Based on the idea of a plugin 'Poll' by Nunfy https://dev-cs.ru/resources/574/
 
 /* ----------------------- */
 
@@ -750,7 +752,7 @@ ShowPollPage(pPlayer, iMenuPage) {
 	show_menu(pPlayer, iKeys, g_szMenu, -1, MENU_IDENT_STRING)
 }
 
-GetQuestionID(const szLangKey[MAX_QD_KEY_LEN]) {
+GetQuestionID(const szLangKey[/*MAX_QD_KEY_LEN*/]) { // 190 compile fix
 	new szString[MAX_QD_KEY_LEN]
 	copy(szString, charsmax(szString), szLangKey)
 
