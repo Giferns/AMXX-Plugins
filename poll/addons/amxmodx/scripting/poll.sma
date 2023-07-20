@@ -498,6 +498,7 @@ public SQL_Handler(iFailState, Handle:hQueryHandle, szError[], iErrorCode, eSqlD
 		#endif
 
 			iTimeStamp += floatround(fQueryTime)
+			// TODO: Wrong! Need replace it with 'g_iTimeDiff = iTimeStamp - get_systime()'
 			g_iTimeDiff = get_systime() - iTimeStamp
 
 			SetSystemInitialized()
