@@ -13,7 +13,7 @@ new const LOGFILE[] = "gl_alphamin_checker.log"
 new g_iBadRequests[MAX_PLAYERS + 1]
 
 public plugin_init() {
-	register_plugin("gl_alphamin checker", "1.0", "mx?!")
+	register_plugin("gl_alphamin checker", "1.1", "mx?!")
 }
 
 public client_putinserver(pPlayer) {
@@ -21,13 +21,13 @@ public client_putinserver(pPlayer) {
 		return
 	}
 
-	set_task(g_fDelay, "task_CheckDelay", pPlayer)
+	set_task(g_fDelay + random_float(-2.0, 2.0), "task_CheckDelay", pPlayer)
 }
 
 public task_CheckDelay(pPlayer) {
 	QueryCvar(pPlayer)
 
-	set_task(g_fFreq, "task_CheckDelay", pPlayer, .flags = "b")
+	set_task(g_fFreq + random_float(-2.0, 2.0), "task_CheckDelay", pPlayer, .flags = "b")
 }
 
 QueryCvar(pPlayer) {
@@ -41,6 +41,7 @@ public CheckValue(pPlayer, szCvar[], szValue[], szParam[]) {
 
 	if(szValue[0] == 'B' && equal(szValue, "Bad CVAR request")) {
 		if(++g_iBadRequests[pPlayer] == g_iMaxBads) {
+			remove_task(pPlayer)
 			log_to_file(LOGFILE, "%N kicked due to bad gl_alphamin value (%i bads)", pPlayer, g_iBadRequests[pPlayer])
 			ShowInfo(pPlayer, "bad request")
 			server_cmd("kick #%i ^"Bad gl_alphamin value^"", get_user_userid(pPlayer))
@@ -54,6 +55,7 @@ public CheckValue(pPlayer, szCvar[], szValue[], szParam[]) {
 	new Float:fValue = str_to_float(szValue)
 
 	if(fValue > g_fMaxValue) {
+		remove_task(pPlayer)
 		log_to_file(LOGFILE, "%N kicked due to wrong gl_alphamin value (%f / %f)", pPlayer, fValue, g_fMaxValue)
 		new szValue[8]; formatex(szValue, charsmax(szValue), "%f", fValue)
 		ShowInfo(pPlayer, szValue)
