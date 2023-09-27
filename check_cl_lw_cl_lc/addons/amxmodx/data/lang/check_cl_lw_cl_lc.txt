@@ -1,0 +1,5 @@
+[ru]
+KICK_CLLW_INFO = Пропишите в консоли: %s 1
+
+[en]
+KICK_CLLW_INFO = Type in the console: %s 1
