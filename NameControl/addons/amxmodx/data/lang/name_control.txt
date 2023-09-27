@@ -1,0 +1,9 @@
+[ru]
+NAME_CONTROL__DO_NOT_SPAM = * Нельзя менять ник чаще одного раза в %0.f сек.
+NAME_CONTROL__CHANGE_NAME_PATTERN = ^4* ^3%n ^1сменил(а) ник на ^3%s
+NAME_CONTROL__WRONG_NAME = * Ник не может содержать IP-адреса и домены!
+
+[en]
+NAME_CONTROL__DO_NOT_SPAM = * You cannot change your nickname more than once every %0.f sec.
+NAME_CONTROL__CHANGE_NAME_PATTERN = ^4* ^3%n ^1changed nickname to ^3%s
+NAME_CONTROL__WRONG_NAME = * Nickname can't contain IP's or domain names!
