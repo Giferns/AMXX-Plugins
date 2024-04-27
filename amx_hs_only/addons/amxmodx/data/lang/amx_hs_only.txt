@@ -1,0 +1,5 @@
+[ru]
+HS_ONLY__ANNOUNCE = ^4* ^3Внимание! ^1Работает режим '^4Убийство только в голову^1' !
+
+[en]
+HS_ONLY__ANNOUNCE = ^4* ^3Attention! ^1The game runs with '^4Headshot kill only^1' mode !
