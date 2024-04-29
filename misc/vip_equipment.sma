@@ -1,8 +1,15 @@
-new const PLUGIN_VERSION[] = "1.0"
+/* 1.1 (29.04.2024 by mx?!):
+	* Добавлен параметр настройки MIN_ROUND
+*/
+
+new const PLUGIN_VERSION[] = "1.1"
 
 // Перечислить буквы amxx-флагов, при наличии любого из которых игрок получает
 //		при первом спавне в раунде щипцы и броню
 new const VIP_FLAGS[] = "d"
+
+// Минимальный раунд для начала выдачи
+const MIN_ROUND = 2
 
 #include amxmodx
 #include reapi
@@ -20,7 +27,7 @@ public plugin_init() {
 }
 
 public CBasePlayer_Spawn_Post(pPlayer) {
-	if(!is_user_alive(pPlayer) || !(get_user_flags(pPlayer) & g_bitVipFlags) || get_member(pPlayer, m_iNumSpawns) > 1) {
+	if(!is_user_alive(pPlayer) || !(get_user_flags(pPlayer) & g_bitVipFlags) || (get_member_game(m_iTotalRoundsPlayed) + 1) < MIN_ROUND || get_member(pPlayer, m_iNumSpawns) > 1) {
 		return
 	}
 
