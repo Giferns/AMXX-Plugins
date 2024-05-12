@@ -494,12 +494,11 @@ public SQL_Handler(iFailState, Handle:hQueryHandle, szError[], iErrorCode, eSqlD
 
 		#if defined DEBUG
 			log_to_file( DEBUG, "[QUERY__INIT_SYSTEM] iTimeStamp: %i, fQueryTime: %f, g_iTimeDiff: %i",
-				iTimeStamp, fQueryTime, get_systime() - (iTimeStamp + floatround(fQueryTime)) );
+				iTimeStamp, fQueryTime, (iTimeStamp + floatround(fQueryTime)) - get_systime() );
 		#endif
 
 			iTimeStamp += floatround(fQueryTime)
-			// TODO: Wrong! Need replace it with 'g_iTimeDiff = iTimeStamp - get_systime()'
-			g_iTimeDiff = get_systime() - iTimeStamp
+			g_iTimeDiff = iTimeStamp - get_systime()
 
 			SetSystemInitialized()
 		}
