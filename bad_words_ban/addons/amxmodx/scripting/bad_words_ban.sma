@@ -2,19 +2,44 @@
  * Credits: Subb98, Mistrick.
  */
 #include <amxmodx>
+#include <regex>
+
+/*
+    1.1 by mx?!:
+        * Import FUNCTION_BLOCK_ADVERTISING from chatmanager_addon.sma
+*/
 
 #define PLUGIN "Bad Words Ban" // based on code from 'Chat Manager: Addon' version '0.0.4-70' by 'Mistrick'
-#define VERSION "1.0"
+#define VERSION "1.1"
 #define AUTHOR "mx?!, Mistrick"
 
 #pragma semicolon 1
+
+// Comment to disable IP/Domain advertising prevention feature, or change value to change ban time (value represents minutes)
+#define FUNCTION_BLOCK_ADVERTISING 60
+// Ban reason for IP/Domain advertising
+stock const ADVERT_BAN_REASON[] = "IP or domain advertising";
+
+#if defined FUNCTION_BLOCK_ADVERTISING
+#define IP_LEN 22
+#define DOMAIN_LEN 32
+new const FILE_WHITE_LIST[] = "bad_words_ban_whitelist.ini";
+new Array:g_aWhiteListIp;
+new Array:g_aWhiteListDomain;
+new g_iWhiteListIpSize;
+new g_iWhiteListDomainSize;
+new Regex:g_rIpPattern;
+new Regex:g_rDomainPattern;
+#endif // FUNCTION_BLOCK_ADVERTISING
 
 new const FILE_BLACK_LIST[] = "bad_words_ban_blacklist.ini";
 new Array:g_aBlackList;
 new g_iBlackListSize;
 
 // USE: fb_ban <time> <#userid> <reason>
-#define BAN_CMD server_cmd("fb_ban %i #%i %s", data[ArrayData_BanMinutes], get_user_userid(id), data[ArrayData_BanReason])
+stock BAN_CMD(id, minutes, const reason[]) server_cmd("fb_ban %i #%i %s", minutes, get_user_userid(id), reason);
+// USE: amx_ban <time in mins> <steamID or nickname or #authid or IP> <reason>
+//stock BAN_CMD(id, minutes, const reason[]) server_cmd("fb_ban %i #%i ^"%s^"", minutes, get_user_userid(id), reason);
 
 new LOGFILE[] = "ban_words_ban.log";
 
@@ -39,6 +64,13 @@ public plugin_precache()
 public plugin_cfg()
 {
     LoadBlackList();
+
+    #if defined FUNCTION_BLOCK_ADVERTISING
+    new error[2], ret;
+    g_rIpPattern = regex_compile("(?:\s*\d+\s*\.){3}", ret, error, charsmax(error));
+    g_rDomainPattern = regex_compile("(?:[A-z]){2,}\.(?:[A-z]){2,}", ret, error, charsmax(error));
+    LoadWhiteList();
+    #endif // FUNCTION_BLOCK_ADVERTISING
 }
 
 LoadBlackList()
@@ -114,11 +146,59 @@ public clcmd_Say(id)
             {
                 g_bBanned[id] = true;
                 log_to_file(LOGFILE, "%N - '%s' - '%s' - '%s' - %i minutes", id, data[ArrayData_Word], message, data[ArrayData_BanReason], data[ArrayData_BanMinutes]);
-                BAN_CMD;
+                BAN_CMD(id, data[ArrayData_BanMinutes], data[ArrayData_BanReason]);
             }
             return PLUGIN_HANDLED;
         }
     }
+
+    #if defined FUNCTION_BLOCK_ADVERTISING
+    static temp[128];
+    new ret;
+    // TODO: Add white list
+    if(regex_match_c(message, g_rIpPattern, ret))
+    {
+        copy(temp, charsmax(temp), message);
+        for(new i, whiteip[IP_LEN]; i < g_iWhiteListIpSize; i++)
+        {
+            ArrayGetString(g_aWhiteListIp, i, whiteip, charsmax(whiteip));
+            while(replace(temp, charsmax(temp), whiteip, "")){}
+        }
+
+        if(regex_match_c(temp, g_rIpPattern, ret))
+        {
+            if(!g_bBanned[id])
+            {
+                g_bBanned[id] = true;
+                log_to_file(LOGFILE, "%N - '%s' - '%s' - %i minutes", id, message, ADVERT_BAN_REASON, FUNCTION_BLOCK_ADVERTISING);
+                BAN_CMD(id, FUNCTION_BLOCK_ADVERTISING, ADVERT_BAN_REASON);
+            }
+
+            return PLUGIN_HANDLED;
+        }
+    }
+    if(regex_match_c(message, g_rDomainPattern, ret))
+    {
+        copy(temp, charsmax(temp), message);
+        for(new i, whitedomain[DOMAIN_LEN]; i < g_iWhiteListDomainSize; i++)
+        {
+            ArrayGetString(g_aWhiteListDomain, i, whitedomain, charsmax(whitedomain));
+            while(replace(temp, charsmax(temp), whitedomain, "")){}
+        }
+
+        if(regex_match_c(temp, g_rDomainPattern, ret))
+        {
+            if(!g_bBanned[id])
+            {
+                g_bBanned[id] = true;
+                log_to_file(LOGFILE, "%N - '%s' - '%s' - %i minutes", id, message, ADVERT_BAN_REASON, FUNCTION_BLOCK_ADVERTISING);
+                BAN_CMD(id, FUNCTION_BLOCK_ADVERTISING, ADVERT_BAN_REASON);
+            }
+
+            return PLUGIN_HANDLED;
+        }
+    }
+    #endif // FUNCTION_BLOCK_ADVERTISING
 
     return PLUGIN_CONTINUE;
 }
@@ -218,3 +298,58 @@ stock wchar_to_multibyte(const wcszInput[], mbszOutput[]) {
     }
     mbszOutput[nOutputChars] = EOS;
 }
+
+#if defined FUNCTION_BLOCK_ADVERTISING
+LoadWhiteList()
+{
+    g_aWhiteListIp = ArrayCreate(IP_LEN, 1);
+    g_aWhiteListDomain = ArrayCreate(DOMAIN_LEN, 1);
+
+    new file_path[128]; get_localinfo("amxx_configsdir", file_path, charsmax(file_path));
+    format(file_path, charsmax(file_path), "%s/%s", file_path, FILE_WHITE_LIST);
+
+    new file = fopen(file_path, "rt");
+
+    enum
+    {
+        READ_NON,
+        READ_DOMAIN,
+        READ_IP
+    };
+
+    if(!file)
+    {
+        set_fail_state("cant %s '%s'", file_exists(file_path) ? "read" : "find", file_path);
+        return;
+    }
+
+    new buffer[64], type = READ_NON;
+    while(fgets(file, buffer, charsmax(buffer)))
+    {
+        trim(buffer);
+        remove_quotes(buffer);
+
+        if(!buffer[0] || buffer[0] == ';') continue;
+
+        if(contain(buffer, "[ips]") > -1)
+        {
+            type = READ_IP;
+            continue;
+        }
+        if(contain(buffer, "[domains]") > -1)
+        {
+            type = READ_DOMAIN;
+            continue;
+        }
+
+        if(type)
+        {
+            ArrayPushString(type == READ_IP ? g_aWhiteListIp : g_aWhiteListDomain, buffer);
+        }
+    }
+    fclose(file);
+
+    g_iWhiteListIpSize = ArraySize(g_aWhiteListIp);
+    g_iWhiteListDomainSize = ArraySize(g_aWhiteListDomain);
+}
+#endif // FUNCTION_BLOCK_ADVERTISING
