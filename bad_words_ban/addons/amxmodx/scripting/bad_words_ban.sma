@@ -9,10 +9,12 @@
         * Import FUNCTION_BLOCK_ADVERTISING from chatmanager_addon.sma
     1.2 by mx?!:
         * Ban for domain advertising changed to block message only
+    1.2.1 by mx?!:
+        * Logname typo fix
 */
 
 #define PLUGIN "Bad Words Ban" // based on code from 'Chat Manager: Addon' version '0.0.4-70' by 'Mistrick'
-#define VERSION "1.2"
+#define VERSION "1.2.1"
 #define AUTHOR "mx?!, Mistrick"
 
 #pragma semicolon 1
@@ -43,7 +45,7 @@ stock BAN_CMD(id, minutes, const reason[]) server_cmd("fb_ban %i #%i %s", minute
 // USE: amx_ban <time in mins> <steamID or nickname or #authid or IP> <reason>
 //stock BAN_CMD(id, minutes, const reason[]) server_cmd("fb_ban %i #%i ^"%s^"", minutes, get_user_userid(id), reason);
 
-new LOGFILE[] = "ban_words_ban.log";
+new LOGFILE[] = "bad_words_ban.log";
 
 #define MAX_WORD_LEN 64
 
