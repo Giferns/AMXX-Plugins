@@ -7,18 +7,20 @@
 /*
     1.1 by mx?!:
         * Import FUNCTION_BLOCK_ADVERTISING from chatmanager_addon.sma
+    1.2 by mx?!:
+        * Ban for domain advertising changed to block message only
 */
 
 #define PLUGIN "Bad Words Ban" // based on code from 'Chat Manager: Addon' version '0.0.4-70' by 'Mistrick'
-#define VERSION "1.1"
+#define VERSION "1.2"
 #define AUTHOR "mx?!, Mistrick"
 
 #pragma semicolon 1
 
-// Comment to disable IP/Domain advertising prevention feature, or change value to change ban time (value represents minutes)
+// Comment to disable IP advertising prevention feature, or change value to change ban time (value represents minutes)
 #define FUNCTION_BLOCK_ADVERTISING 60
-// Ban reason for IP/Domain advertising
-stock const ADVERT_BAN_REASON[] = "IP or domain advertising";
+// Ban reason for IP advertising
+stock const ADVERT_BAN_REASON[] = "IP advertising";
 
 #if defined FUNCTION_BLOCK_ADVERTISING
 #define IP_LEN 22
@@ -188,13 +190,7 @@ public clcmd_Say(id)
 
         if(regex_match_c(temp, g_rDomainPattern, ret))
         {
-            if(!g_bBanned[id])
-            {
-                g_bBanned[id] = true;
-                log_to_file(LOGFILE, "%N - '%s' - '%s' - %i minutes", id, message, ADVERT_BAN_REASON, FUNCTION_BLOCK_ADVERTISING);
-                BAN_CMD(id, FUNCTION_BLOCK_ADVERTISING, ADVERT_BAN_REASON);
-            }
-
+            //log_to_file(LOGFILE, "%N - '%s'", id, message);
             return PLUGIN_HANDLED;
         }
     }
@@ -229,15 +225,6 @@ stock wchar_tolower_rus(str[])
             str[i] += 0x20;
         }
     }
-}
-
-stock wchar_is_uppercase(ch)
-{
-    if(0x41 <= ch <= 0x5A || ch == 0x401 || 0x410 <= ch <= 0x42F)
-    {
-        return true;
-    }
-    return false;
 }
 
 // Converts MultiByte (UTF-8) to WideChar (UTF-16, UCS-2)
