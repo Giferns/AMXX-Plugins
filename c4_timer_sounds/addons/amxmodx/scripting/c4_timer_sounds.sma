@@ -1,7 +1,7 @@
 #include amxmodx
 #include reapi
 
-new const PLUGIN_VERSION[] = "1.0"
+new const PLUGIN_VERSION[] = "1.1"
 
 enum _:SoundsEnum {
 	SOUND__1,
@@ -31,8 +31,8 @@ new const g_szSounds[SoundsEnum][] = {
 	"sound/bts/9_sec.mp3",
 	"sound/bts/10_sec.mp3",
 	"sound/bts/20_sec.mp3",
-	"bts/jopki.wav",
-	"bts/finish.wav"
+	"bts/jopki3.wav",
+	"bts/finish3.wav"
 }
 
 const TASKID__TIMER = 1337
@@ -90,6 +90,10 @@ public task_Timer() {
 }
 
 public CGrenade_ExplodeBomb_Post(const this, tracehandle, const bitsDamageType) {
+	set_task(1.5, "task_PlayExplode")
+}
+
+public task_PlayExplode() {
 	client_cmd(0, "spk %s", g_szSounds[SOUND__EXPLODE])
 }
 
