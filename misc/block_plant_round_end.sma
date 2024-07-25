@@ -3,7 +3,7 @@
 #include <hamsandwich>
 
 #define NAME		"BLOCK PLANT ROUND END"
-#define VERSION	"1.1"
+#define VERSION	"1.2"
 #define AUTHOR	"Albertio"
 
 new HamHook:g_pHook_Weapon_PrimaryAttack;
@@ -36,7 +36,6 @@ public C4_PrimaryAttack_Pre(const pItem)
 	new pPlayer = get_pdata_cbase(pItem, m_pPlayer, 4);
 
 	if(pev_valid(pPlayer)) {
-		server_print("%f", get_gametime())
 		set_pdata_float(pItem, m_flNextPrimaryAttack, 1.0, 4);
 		client_print(pPlayer, print_center, "%l", "BRT__CANT_PLANT_END_ROUND");
 	}
@@ -58,7 +57,7 @@ public logevent_round_end()
 	for(new i; i < iPlCount; i++) {
 		pWeapon = get_pdata_cbase(pPlayers[i], m_pActiveItem, 5);
 
-		if(pWeapon > 0 && pev_valid(pWeapon) == 2 && get_pdata_int(pWeapon, m_iId, 4) == CSW_C4) {
+		if(pWeapon > 0 && pev_valid(pWeapon) == 2 && get_pdata_int(pWeapon, m_iId, 4) == CSW_C4 && get_ent_data(pWeapon, "CC4", "m_bStartedArming")) {
 			ExecuteHamB(Ham_Weapon_RetireWeapon, pWeapon);
 		}
 	}
