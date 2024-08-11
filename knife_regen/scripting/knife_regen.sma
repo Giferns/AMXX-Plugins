@@ -1,5 +1,10 @@
+/*
+	1.1 (11.08.2024 by mx?!):
+		* Fixed cvar registration for 'amx_rk_max_hp', thx @Nord1cWarr1or
+*/
+
 // Code based on plugin "Regen HP AP for knife" https://dev-cs.ru/resources/673/, author "I Am LeGenD"
-new const PLUGIN_VERSION[] = "1.0"
+new const PLUGIN_VERSION[] = "1.1"
 
 #include <amxmodx>
 #include <hamsandwich>
@@ -80,7 +85,7 @@ RegCvars() {
 		g_eCvar[CVAR__ARMOR_AMT]
 	);
 
-	bind_pcvar_num(
+	bind_pcvar_float(
 		create_cvar( "amx_rk_max_hp", "0",
 			.description = "Максимальный объём здоровья, который можно восстановить (0: использовать var_max_health)",
 			.has_min = true, .min_val = 0.0
