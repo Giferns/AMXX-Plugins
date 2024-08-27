@@ -42,7 +42,7 @@
 /* Changelog:
 	1.0 (27.08.2024) by mx?!:
 		* First release
-	1.1 (28.08.2024) by mx?!:
+	1.1 (27.08.2024) by mx?!:
 		* Fixed exitem_resp_block_suicide cvar logic, as state did not affect behavior
 */
 
