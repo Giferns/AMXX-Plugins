@@ -42,10 +42,12 @@
 /* Changelog:
 	1.0 (27.08.2024) by mx?!:
 		* First release
+	1.1 (28.08.2024) by mx?!:
+		* Fixed exitem_resp_block_suicide cvar logic, as state did not affect behavior
 */
 
 new const PLUGIN_NAME[] = "ExItem: Respawn";
-new const PLUGIN_VERSION[] = "1.0";
+new const PLUGIN_VERSION[] = "1.1";
 
 #pragma semicolon 1
 
@@ -499,7 +501,7 @@ public CBasePlayer_Spawn_Pre(pPlayer) {
 }
 
 public CBasePlayer_Killed_Pre(pVictim, pKiller, iGibType) {
-	g_bSuicide[pVictim] = (pVictim == pKiller || !is_user_connected(pKiller));
+	g_bSuicide[pVictim] = (g_eCvar[CVAR__BLOCK_SUICIDE] && (pVictim == pKiller || !is_user_connected(pKiller)));
 	g_iTeam[pVictim] = get_member(pVictim, m_iTeam);
 	g_fDeathTime[pVictim] = get_gametime();
 }
