@@ -1,6 +1,18 @@
 [ru]
-EXITEMS__NO_ACCESS = У вас нет доступа к данному пункту меню!
-EXITEMS__ONLY_BUYZONE = Доступно только в зоне закупки!
-EXITEMS__BUYTIME_OVER = Время на покупку истекло!
-EXITEMS__ALREADY_WEAPON = У Вас уже есть это оружие!
-EXITEMS__BUY_COOLDOWN = Подождите ещё %i сек.
+EXITEMS__NO_ACCESS = ^3У вас нет доступа к данному пункту меню!
+EXITEMS__ONLY_BUYZONE = ^3Доступно только в зоне закупки!
+EXITEMS__BUYTIME_OVER = ^3Время на покупку истекло!
+EXITEMS__ALREADY_WEAPON = ^3У Вас уже есть это оружие!
+EXITEMS__BUY_COOLDOWN = ^3Подождите ещё ^4%i ^3сек.
+
+EXITEMS__ONLY_DEAD = ^3Только для мёртвых игроков!
+EXITEMS__RESPAWN_INFO_ALL = ^3%n ^1использует ^4Возрождение!
+EXITEMS__MAX_PER_ROUND = ^3Достигнут лимит, ждите новый раунд!
+EXITEMS__TEAM_CHANGED = ^3Вы сменили команду, функция недоступна!
+EXITEMS__DELAY_SECS = ^3Подождите ещё ^4%i ^3сек.
+EXITEMS__DELAY_OBSERVER = ^3Дождитесь перехода в режим наблюдения!
+EXITEMS__TIME_EXPIRED = ^3Время на использование функции истекло!
+EXITEMS__FUNC_UNA = ^3Функция недоступна!
+EXITEMS__BUY_CD_ROUNDS = ^3Подождите ещё ^4%i ^3раунд(ов)
+EXITEMS__FIRSTROUND = ^3Доступно с ^4%i ^3раунда, сейчас ^4%i
+EXITEMS__INSUFFICIENTLY = ^3Недостаточно поинтов!
