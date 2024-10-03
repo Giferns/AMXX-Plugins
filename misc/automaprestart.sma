@@ -1,13 +1,18 @@
+/*
+	1.1:
+		* get_mapname() changed to rh_get_mapname()
+*/
+
 #pragma semicolon 1
 
 #include <amxmodx>
 #include <reapi>
 
 // Лимит раундов (счётчик НЕ сбрасывается при рестартах и game commencing)
-const MAXROUNDS = 200;
+const MAXROUNDS = 5;
 
 public plugin_init() {
-	register_plugin("AutoMapRestart", "1.0", "mx?!");
+	register_plugin("AutoMapRestart", "1.1", "mx?!");
 
 	RegisterHookChain(RG_CSGameRules_RestartRound, "CSGameRules_RestartRound", .post = true);
 }
@@ -27,6 +32,6 @@ public CSGameRules_RestartRound(WinStatus:status, ScenarioEventEndRound:event, F
 
 public task_ChangeLevel() {
 	new szMapName[64];
-	get_mapname(szMapName, charsmax(szMapName));
+	rh_get_mapname(szMapName, charsmax(szMapName), MNT_TRUE);
 	server_cmd("changelevel %s", szMapName);
 }
