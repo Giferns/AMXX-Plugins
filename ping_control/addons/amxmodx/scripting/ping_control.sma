@@ -18,9 +18,12 @@
 
 	1.2 (23.01.2023) by mx?!:
 		* Added cvar 'ping_ema_mode' (thx to wopox1337)
+		
+	1.3 (16.11.2024) by mx?!:
+		* Added cvar 'ping_kick_per_cycle' (How many players can be kicked in one check) [thx to @GALAXY009]
 */
 
-new const PLUGIN_VERSION[] = "1.2"
+new const PLUGIN_VERSION[] = "1.3"
 
 #include amxmodx
 #include reapi
@@ -48,7 +51,8 @@ enum _:CVAR_ENUM {
 	CVAR__MAX_FLUCTUATION_WARNS,
 	CVAR__DEC_FLUCTUATION_WARNS,
 	CVAR__AVERAGE_COUNT,
-	CVAR__EMA_MODE
+	CVAR__EMA_MODE,
+	CVAR__KICK_PER_CYCLE
 }
 
 new g_eCvar[CVAR_ENUM], g_iPingWarns[MAX_PLAYERS + 1], g_iPingSum[MAX_PLAYERS + 1], g_iPingTests[MAX_PLAYERS + 1]
@@ -138,6 +142,12 @@ func_RegCvars() {
 		.desc = "Использовать среднее скользящее для сглаживания скачков при расчёте пинга?",
 		.bind = g_eCvar[CVAR__EMA_MODE]
 	);
+	
+	bind_cvar_num( "ping_kick_per_cycle", "1",
+		.has_min = true, .min_val = 1.0,
+		.desc = "Сколько игроков можно кикнуть за одну проверку",
+		.bind = g_eCvar[CVAR__KICK_PER_CYCLE]
+	);
 
 #if defined AUTO_CFG
 	AutoExecConfig(/*.name = "PluginName"*/)
@@ -154,7 +164,7 @@ public task_Check() {
 	new pPlayers[MAX_PLAYERS], iPlCount, pPlayer, bitImmunity = read_flags(g_eCvar[CVAR__IMMUNITY_FLAG])
 	get_players(pPlayers, iPlCount, "ch")
 
-	for(new i, iPing, iLoss; i < iPlCount; i++) {
+	for(new i, iPing, iLoss, iPunishCount; i < iPlCount; i++) {
 		pPlayer = pPlayers[i]
 
 		if(get_user_flags(pPlayer) & bitImmunity) {
@@ -167,6 +177,10 @@ public task_Check() {
 
 		if(CheckPing(pPlayer, iPing, iLoss) || CheckFluctuation(pPlayer, iPing)) {
 			PunishPlayer(pPlayer)
+			
+			if(++iPunishCount >= g_eCvar[CVAR__KICK_PER_CYCLE]) {
+				return
+			}
 		}
 	}
 }
