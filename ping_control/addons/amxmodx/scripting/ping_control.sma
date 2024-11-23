@@ -21,9 +21,18 @@
 		
 	1.3 (16.11.2024) by mx?!:
 		* Added cvar 'ping_kick_per_cycle' (How many players can be kicked in one check) [thx to @GALAXY009]
+		
+	1.4 (23.11.2024) by mx?!:
+		* Added cvar 'ping_check_seconds' (Player is checked only for the first # seconds)
+		* Added cvar 'ping_log_kicks' (Log kicks to specified log file)
+		* Added "0" cvar value for `ping_warn_loss` (Ability to disable loss checking)
+		* Default value for 'ping_warn_loss' is set to "0" (Loss check disabled by default)
+		* Now the loss calculation also follows the logic of `ping_ema_mode` and `ping_average_count`
+		* The ping/loss counter has been separated. Now warnings are counted independently.
+		* Added cvar `ping_checks_enabled` (Ability to globally disable checks)
 */
 
-new const PLUGIN_VERSION[] = "1.3"
+new const PLUGIN_VERSION[] = "1.4"
 
 #include amxmodx
 #include reapi
@@ -34,11 +43,14 @@ new const PLUGIN_VERSION[] = "1.3"
 #define AUTO_CFG
 
 // Minimal ping tests count for EMA mode (cvar 'ping_ema_mode')
+// Do not set it lower than 1
 //
 // Минимальное кол-во тестов для режима средней скользящей (квар 'ping_ema_mode')
+// Не задавать значение меньше 1
 #define MIN_EMA_TESTS 3
 
 enum _:CVAR_ENUM {
+	CVAR__CHECKS_ENABLED,
 	Float:CVAR_F__CHECK_INTERVAL,
 	CVAR__WARN_PING,
 	CVAR__WARN_LOSS,
@@ -52,12 +64,15 @@ enum _:CVAR_ENUM {
 	CVAR__DEC_FLUCTUATION_WARNS,
 	CVAR__AVERAGE_COUNT,
 	CVAR__EMA_MODE,
-	CVAR__KICK_PER_CYCLE
+	CVAR__KICK_PER_CYCLE,
+	CVAR__LOG_KICKS[64],
+	CVAR__CHECK_SECONDS
 }
 
-new g_eCvar[CVAR_ENUM], g_iPingWarns[MAX_PLAYERS + 1], g_iPingSum[MAX_PLAYERS + 1], g_iPingTests[MAX_PLAYERS + 1]
+new g_eCvar[CVAR_ENUM], g_iPingWarns[MAX_PLAYERS + 1], g_iPingSum[MAX_PLAYERS + 1], g_iTests[MAX_PLAYERS + 1]
 new g_iLastPing[MAX_PLAYERS + 1], g_iFluctuationWarns[MAX_PLAYERS + 1], g_iDecFluctCounter[MAX_PLAYERS + 1]
-new g_iDecPingCounter[MAX_PLAYERS + 1], Float:g_fPlayerPingEMA[MAX_PLAYERS + 1]
+new g_iDecPingCounter[MAX_PLAYERS + 1], Float:g_fPlayerPingEMA[MAX_PLAYERS + 1], Float:g_fPlayerLossEMA[MAX_PLAYERS + 1]
+new g_iLossSum[MAX_PLAYERS + 1], g_iLossWarns[MAX_PLAYERS + 1], g_iDecLossCounter[MAX_PLAYERS + 1]
 
 public plugin_init() {
 	register_plugin("Ping Control", PLUGIN_VERSION, "mx?!")
@@ -69,6 +84,11 @@ public plugin_init() {
 }
 
 func_RegCvars() {
+	bind_cvar_num( "ping_checks_enabled", "1",
+		.desc = "Включить проверки (1) или выключить (0) ?",
+		.bind = g_eCvar[CVAR__CHECKS_ENABLED]
+	);
+
 	bind_cvar_float( "ping_time_check", "10",
 		.has_min = true, .min_val = 1.0,
 		.desc = "Интервал между проверками (в секундах)",
@@ -80,8 +100,9 @@ func_RegCvars() {
 		.bind = g_eCvar[CVAR__WARN_PING]
 	);
 
-	bind_cvar_num( "ping_warn_loss", "25",
-		.desc = "Если потери пакетов игрока # или выше, игрок получает предупреждение",
+	bind_cvar_num( "ping_warn_loss", "0",
+		.has_min = true, .min_val = 0.0,
+		.desc = "Если потери пакетов игрока # или выше, игрок получает предупреждение (0 - выкл.)",
 		.bind = g_eCvar[CVAR__WARN_LOSS]
 	);
 
@@ -107,6 +128,12 @@ func_RegCvars() {
 	bind_cvar_string( "ping_immunity_flag", "",
 		.desc = "Флаги иммунитета к наказанию (требуется любой из; ^"^" - выкл.)",
 		.bind = g_eCvar[CVAR__IMMUNITY_FLAG], .maxlen = charsmax(g_eCvar[CVAR__IMMUNITY_FLAG])
+	);
+	
+	bind_cvar_num( "ping_check_seconds", "0",
+		.has_min = true, .min_val = 0.0,
+		.desc = "Проверять игрока только первые # секунд после входа на сервер (0 - проверять всё время)",
+		.bind = g_eCvar[CVAR__CHECK_SECONDS]
 	);
 
 	bind_cvar_num( "ping_dec_ping_warns", "6",
@@ -148,6 +175,11 @@ func_RegCvars() {
 		.desc = "Сколько игроков можно кикнуть за одну проверку",
 		.bind = g_eCvar[CVAR__KICK_PER_CYCLE]
 	);
+	
+	bind_cvar_string( "ping_log_kicks", "ping_control.log",
+		.desc = "Логировать кики в указанный файл в 'amxmodx/logs' (^"^" - выкл.)",
+		.bind = g_eCvar[CVAR__LOG_KICKS], .maxlen = charsmax(g_eCvar[CVAR__LOG_KICKS])
+	);
 
 #if defined AUTO_CFG
 	AutoExecConfig(/*.name = "PluginName"*/)
@@ -161,6 +193,10 @@ public func_SetTask() {
 public task_Check() {
 	func_SetTask()
 
+	if(!g_eCvar[CVAR__CHECKS_ENABLED]) {
+		return
+	}
+
 	new pPlayers[MAX_PLAYERS], iPlCount, pPlayer, bitImmunity = read_flags(g_eCvar[CVAR__IMMUNITY_FLAG])
 	get_players(pPlayers, iPlCount, "ch")
 
@@ -170,13 +206,17 @@ public task_Check() {
 		if(get_user_flags(pPlayer) & bitImmunity) {
 			continue
 		}
+		
+		if(g_eCvar[CVAR__CHECK_SECONDS] && get_user_time(pPlayer) > g_eCvar[CVAR__CHECK_SECONDS]) {
+			continue
+		}
 
-		g_iPingTests[pPlayer]++
+		g_iTests[pPlayer]++
 
 		GetUserPing(pPlayer, iPing, iLoss)
 
 		if(CheckPing(pPlayer, iPing, iLoss) || CheckFluctuation(pPlayer, iPing)) {
-			PunishPlayer(pPlayer)
+			PunishPlayer(pPlayer, iPing, iLoss)
 			
 			if(++iPunishCount >= g_eCvar[CVAR__KICK_PER_CYCLE]) {
 				return
@@ -187,22 +227,25 @@ public task_Check() {
 
 GetUserPing(pPlayer, &iPing, &iLoss) {
 	get_user_ping(pPlayer, iPing, iLoss)
-
+	
 	if(!g_eCvar[CVAR__EMA_MODE]) {
 		return
 	}
 
 	static Float:fAlpha
 
-	fAlpha = 2.0 / g_iPingTests[pPlayer]
+	fAlpha = 2.0 / g_iTests[pPlayer]
 	g_fPlayerPingEMA[pPlayer] = (fAlpha * iPing) + (1.0 - fAlpha) * g_fPlayerPingEMA[pPlayer]
+	g_fPlayerLossEMA[pPlayer] = (fAlpha * iLoss) + (1.0 - fAlpha) * g_fPlayerLossEMA[pPlayer]
 
-	if(g_iPingTests[pPlayer] < MIN_EMA_TESTS) {
+	if(g_iTests[pPlayer] < MIN_EMA_TESTS) {
 		iPing = 0
+		iLoss = 0
 		return
 	}
 
 	iPing = floatround(g_fPlayerPingEMA[pPlayer])
+	iLoss = floatround(g_fPlayerLossEMA[pPlayer])
 }
 
 bool:CheckPing(pPlayer, iPing, iLoss) {
@@ -215,39 +258,68 @@ bool:CheckPing(pPlayer, iPing, iLoss) {
 
 bool:CheckAveragePing(pPlayer, iPing, iLoss) {
 	g_iPingSum[pPlayer] += iPing
-
-	if(g_iPingTests[pPlayer] >= g_eCvar[CVAR__AVERAGE_COUNT]) {
-		if(g_eCvar[CVAR__EMA_MODE]) {
-			if(iPing >= g_eCvar[CVAR__WARN_PING]) {
-				return true
-			}
+	g_iLossSum[pPlayer] += iLoss
+		
+	if(g_iTests[pPlayer] < g_eCvar[CVAR__AVERAGE_COUNT]) {
+		return false
+	}
+	
+	if(g_eCvar[CVAR__EMA_MODE]) {
+		if(iPing >= g_eCvar[CVAR__WARN_PING]) {
+			return true
 		}
-		else if(g_iPingSum[pPlayer] / g_iPingTests[pPlayer] >= g_eCvar[CVAR__WARN_PING]) {
+		
+		if(g_eCvar[CVAR__WARN_LOSS] && iLoss >= g_eCvar[CVAR__WARN_LOSS]) {
 			return true
 		}
 	}
-
-	if(iLoss < g_eCvar[CVAR__WARN_LOSS]) {
-		DecrementPingWarns(pPlayer)
-		return false
+	else {
+		if(g_iPingSum[pPlayer] / g_iTests[pPlayer] >= g_eCvar[CVAR__WARN_PING]) {
+			return true
+		}
+		
+		if(g_eCvar[CVAR__WARN_LOSS] && g_iLossSum[pPlayer] / g_iTests[pPlayer] >= g_eCvar[CVAR__WARN_LOSS]) {
+			return true
+		}
 	}
-
-	return (++g_iPingWarns[pPlayer] >= g_eCvar[CVAR__MAX_WARNS])
+	
+	return false
 }
 
 bool:CheckInstantPing(pPlayer, iPing, iLoss) {
-	if(iPing < g_eCvar[CVAR__WARN_PING] && iLoss < g_eCvar[CVAR__WARN_LOSS]) {
+	new bool:bHighPing = (iPing >= g_eCvar[CVAR__WARN_PING])
+	new bool:bHighLoss = (g_eCvar[CVAR__WARN_LOSS] && iLoss >= g_eCvar[CVAR__WARN_LOSS])
+	
+	if(!bHighPing) {
 		DecrementPingWarns(pPlayer)
-		return false
+	}
+	
+	if(!bHighLoss) {
+		DecrementLossWarns(pPlayer)
+	}
+	
+	if(bHighPing && ++g_iPingWarns[pPlayer] >= g_eCvar[CVAR__MAX_WARNS]) {
+		return true
 	}
 
-	return (++g_iPingWarns[pPlayer] >= g_eCvar[CVAR__MAX_WARNS])
+	if(bHighLoss && ++g_iLossWarns[pPlayer] >= g_eCvar[CVAR__MAX_WARNS]) {
+		return true
+	}
+	
+	return false
 }
 
 DecrementPingWarns(pPlayer) {
 	if(g_iPingWarns[pPlayer] && g_eCvar[CVAR__DEC_PING_WARNS] && ++g_iDecPingCounter[pPlayer] >= g_eCvar[CVAR__DEC_PING_WARNS]) {
 		g_iPingWarns[pPlayer]--
 		g_iDecPingCounter[pPlayer] = 0
+	}
+}
+
+DecrementLossWarns(pPlayer) {
+	if(g_iLossWarns[pPlayer] && g_eCvar[CVAR__DEC_PING_WARNS] && ++g_iDecLossCounter[pPlayer] >= g_eCvar[CVAR__DEC_PING_WARNS]) {
+		g_iLossWarns[pPlayer]--
+		g_iDecLossCounter[pPlayer] = 0
 	}
 }
 
@@ -276,9 +348,13 @@ bool:CheckFluctuation(pPlayer, iPing) {
 	return (++g_iFluctuationWarns[pPlayer] >= g_eCvar[CVAR__MAX_FLUCTUATION_WARNS])
 }
 
-PunishPlayer(pPlayer) {
+PunishPlayer(pPlayer, iPing, iLoss) {
 	if(g_eCvar[CVAR__NOTICE_PUNISH]) {
 		client_print_color(0, pPlayer, "%L", LANG_PLAYER, "PC__KICK_ALL", pPlayer)
+	}
+	
+	if(g_eCvar[CVAR__LOG_KICKS][0]) {
+		log_to_file(g_eCvar[CVAR__LOG_KICKS], "PingKick: %N [tests %i, current ping %i/%i, current loss %i/%i]", pPlayer, g_iTests[pPlayer], iPing, g_eCvar[CVAR__WARN_PING], iLoss, g_eCvar[CVAR__WARN_LOSS]) 
 	}
 
 	if(g_eCvar[CVAR__BAN_MINS]) {
@@ -295,10 +371,13 @@ public task_BanIP(const szIP[], iBanMins) {
 }
 
 public client_connect(pPlayer) {
-	g_iPingWarns[pPlayer] = g_iPingSum[pPlayer] = g_iPingTests[pPlayer] = 0
+	g_iPingWarns[pPlayer] = g_iLossWarns[pPlayer] = 0
+	g_iPingSum[pPlayer] = g_iLossSum[pPlayer] = 0
+	g_iTests[pPlayer] = 0
 	g_iLastPing[pPlayer] = g_iFluctuationWarns[pPlayer] = g_iDecFluctCounter[pPlayer] = 0
-	g_iDecPingCounter[pPlayer] = 0
+	g_iDecPingCounter[pPlayer] = g_iDecLossCounter[pPlayer] = 0
 	g_fPlayerPingEMA[pPlayer] = 1.0
+	g_fPlayerLossEMA[pPlayer] = 1.0
 }
 
 stock bind_cvar_num(const cvar[], const value[], flags = FCVAR_NONE, const desc[] = "", bool:has_min = false, Float:min_val = 0.0, bool:has_max = false, Float:max_val = 0.0, &bind) {
