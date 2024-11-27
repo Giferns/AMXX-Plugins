@@ -30,9 +30,12 @@
 		* Now the loss calculation also follows the logic of `ping_ema_mode` and `ping_average_count`
 		* The ping/loss counter has been separated. Now warnings are counted independently.
 		* Added cvar `ping_checks_enabled` (Ability to globally disable checks)
+	
+	1.5 (27.11.2024) by mx?!:
+		* Kick reason added to logging
 */
 
-new const PLUGIN_VERSION[] = "1.4"
+new const PLUGIN_VERSION[] = "1.5"
 
 #include amxmodx
 #include reapi
@@ -48,6 +51,8 @@ new const PLUGIN_VERSION[] = "1.4"
 // Минимальное кол-во тестов для режима средней скользящей (квар 'ping_ema_mode')
 // Не задавать значение меньше 1
 #define MIN_EMA_TESTS 3
+
+#define MAX_REASON_LEN 32
 
 enum _:CVAR_ENUM {
 	CVAR__CHECKS_ENABLED,
@@ -197,7 +202,8 @@ public task_Check() {
 		return
 	}
 
-	new pPlayers[MAX_PLAYERS], iPlCount, pPlayer, bitImmunity = read_flags(g_eCvar[CVAR__IMMUNITY_FLAG])
+	new pPlayers[MAX_PLAYERS], iPlCount, pPlayer, szReason[MAX_REASON_LEN]
+	new bitImmunity = read_flags(g_eCvar[CVAR__IMMUNITY_FLAG])
 	get_players(pPlayers, iPlCount, "ch")
 
 	for(new i, iPing, iLoss, iPunishCount; i < iPlCount; i++) {
@@ -215,8 +221,8 @@ public task_Check() {
 
 		GetUserPing(pPlayer, iPing, iLoss)
 
-		if(CheckPing(pPlayer, iPing, iLoss) || CheckFluctuation(pPlayer, iPing)) {
-			PunishPlayer(pPlayer, iPing, iLoss)
+		if(CheckPing(pPlayer, iPing, iLoss, szReason) || CheckFluctuation(pPlayer, iPing, szReason)) {
+			PunishPlayer(pPlayer, iPing, iLoss, szReason)
 			
 			if(++iPunishCount >= g_eCvar[CVAR__KICK_PER_CYCLE]) {
 				return
@@ -248,15 +254,15 @@ GetUserPing(pPlayer, &iPing, &iLoss) {
 	iLoss = floatround(g_fPlayerLossEMA[pPlayer])
 }
 
-bool:CheckPing(pPlayer, iPing, iLoss) {
+bool:CheckPing(pPlayer, iPing, iLoss, szReason[MAX_REASON_LEN]) {
 	if(g_eCvar[CVAR__AVERAGE_COUNT]) {
-		return CheckAveragePing(pPlayer, iPing, iLoss)
+		return CheckAveragePing(pPlayer, iPing, iLoss, szReason)
 	}
 
-	return CheckInstantPing(pPlayer, iPing, iLoss)
+	return CheckInstantPing(pPlayer, iPing, iLoss, szReason)
 }
 
-bool:CheckAveragePing(pPlayer, iPing, iLoss) {
+bool:CheckAveragePing(pPlayer, iPing, iLoss, szReason[MAX_REASON_LEN]) {
 	g_iPingSum[pPlayer] += iPing
 	g_iLossSum[pPlayer] += iLoss
 		
@@ -266,19 +272,23 @@ bool:CheckAveragePing(pPlayer, iPing, iLoss) {
 	
 	if(g_eCvar[CVAR__EMA_MODE]) {
 		if(iPing >= g_eCvar[CVAR__WARN_PING]) {
+			copy(szReason, charsmax(szReason), "average ping [ema]")
 			return true
 		}
 		
 		if(g_eCvar[CVAR__WARN_LOSS] && iLoss >= g_eCvar[CVAR__WARN_LOSS]) {
+			copy(szReason, charsmax(szReason), "average loss [ema]")
 			return true
 		}
 	}
 	else {
 		if(g_iPingSum[pPlayer] / g_iTests[pPlayer] >= g_eCvar[CVAR__WARN_PING]) {
+			copy(szReason, charsmax(szReason), "average ping")
 			return true
 		}
 		
 		if(g_eCvar[CVAR__WARN_LOSS] && g_iLossSum[pPlayer] / g_iTests[pPlayer] >= g_eCvar[CVAR__WARN_LOSS]) {
+			copy(szReason, charsmax(szReason), "average loss")
 			return true
 		}
 	}
@@ -286,7 +296,7 @@ bool:CheckAveragePing(pPlayer, iPing, iLoss) {
 	return false
 }
 
-bool:CheckInstantPing(pPlayer, iPing, iLoss) {
+bool:CheckInstantPing(pPlayer, iPing, iLoss, szReason[MAX_REASON_LEN]) {
 	new bool:bHighPing = (iPing >= g_eCvar[CVAR__WARN_PING])
 	new bool:bHighLoss = (g_eCvar[CVAR__WARN_LOSS] && iLoss >= g_eCvar[CVAR__WARN_LOSS])
 	
@@ -299,10 +309,12 @@ bool:CheckInstantPing(pPlayer, iPing, iLoss) {
 	}
 	
 	if(bHighPing && ++g_iPingWarns[pPlayer] >= g_eCvar[CVAR__MAX_WARNS]) {
+		copy(szReason, charsmax(szReason), "instant ping")
 		return true
 	}
 
 	if(bHighLoss && ++g_iLossWarns[pPlayer] >= g_eCvar[CVAR__MAX_WARNS]) {
+		copy(szReason, charsmax(szReason), "instant loss")
 		return true
 	}
 	
@@ -323,7 +335,7 @@ DecrementLossWarns(pPlayer) {
 	}
 }
 
-bool:CheckFluctuation(pPlayer, iPing) {
+bool:CheckFluctuation(pPlayer, iPing, szReason[MAX_REASON_LEN]) {
 	if(!g_eCvar[CVAR__MAX_FLUCTUATION_WARNS]) {
 		return false
 	}
@@ -345,16 +357,21 @@ bool:CheckFluctuation(pPlayer, iPing) {
 		return false
 	}
 
-	return (++g_iFluctuationWarns[pPlayer] >= g_eCvar[CVAR__MAX_FLUCTUATION_WARNS])
+	if(++g_iFluctuationWarns[pPlayer] >= g_eCvar[CVAR__MAX_FLUCTUATION_WARNS]) {
+		copy(szReason, charsmax(szReason), "ping fluctuation")
+		return true
+	}
+	
+	return false
 }
 
-PunishPlayer(pPlayer, iPing, iLoss) {
+PunishPlayer(pPlayer, iPing, iLoss, const szReason[]) {
 	if(g_eCvar[CVAR__NOTICE_PUNISH]) {
 		client_print_color(0, pPlayer, "%L", LANG_PLAYER, "PC__KICK_ALL", pPlayer)
 	}
 	
 	if(g_eCvar[CVAR__LOG_KICKS][0]) {
-		log_to_file(g_eCvar[CVAR__LOG_KICKS], "PingKick: %N [tests %i, current ping %i/%i, current loss %i/%i]", pPlayer, g_iTests[pPlayer], iPing, g_eCvar[CVAR__WARN_PING], iLoss, g_eCvar[CVAR__WARN_LOSS]) 
+		log_to_file(g_eCvar[CVAR__LOG_KICKS], "PingKick: %N [tests %i, current ping %i/%i, current loss %i/%i, reason '%s']", pPlayer, g_iTests[pPlayer], iPing, g_eCvar[CVAR__WARN_PING], iLoss, g_eCvar[CVAR__WARN_LOSS], szReason) 
 	}
 
 	if(g_eCvar[CVAR__BAN_MINS]) {
