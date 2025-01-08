@@ -44,10 +44,12 @@
 		* First release
 	1.1 (27.08.2024) by mx?!:
 		* Fixed exitem_resp_block_suicide cvar logic, as state did not affect behavior
+	1.2 (08.01.2025) by mx?!:
+		* Added cvar exitem_resp_force_clcmd, allowing to execute a defined console command on behalf of the player, immediately after the player respawns
 */
 
 new const PLUGIN_NAME[] = "ExItem: Respawn";
-new const PLUGIN_VERSION[] = "1.1";
+new const PLUGIN_VERSION[] = "1.2";
 
 #pragma semicolon 1
 
@@ -102,7 +104,8 @@ enum _:CVAR_ENUM {
 	CVAR__BLOCK_LAST_TEAMMATE,
 	CVAR__BLOCK_DUEL,
 	CVAR__BLOCK_BOMB,
-	CVAR__MIN_PLAYERS
+	CVAR__MIN_PLAYERS,
+	CVAR__FORCE_CLCMD[64]
 };
 
 new g_eCvar[CVAR_ENUM];
@@ -236,6 +239,11 @@ RegCvars() {
 	bind_cvar_num( "exitem_resp_min_players", "0",
 		.desc = "Минимальное кол-во играющих (без зрителей) для работы функции (0 - без ограничения)",
 		.bind = g_eCvar[CVAR__MIN_PLAYERS]
+	);
+	
+	bind_cvar_string( "exitem_resp_force_clcmd", "",
+		.desc = "Выполнить заданную консольную команду от имени игрока, непосредственно после респавна игрока",
+		.bind = g_eCvar[CVAR__FORCE_CLCMD], .maxlen = charsmax(g_eCvar[CVAR__FORCE_CLCMD])
 	);
 
 	new szPath[240];
@@ -494,6 +502,12 @@ RespawnPlayer(pPlayer) {
 	}
 
 	client_print_color(0, print_team_default, "%l", "EXITEMS__RESPAWN_INFO_ALL", pPlayer);
+	
+	if(g_eCvar[CVAR__FORCE_CLCMD][0]) {
+		new szCmd[64], szArg1[32], szArg2[32];
+		parse(g_eCvar[CVAR__FORCE_CLCMD], szCmd, charsmax(szCmd), szArg1, charsmax(szArg1), szArg2, charsmax(szArg2));
+		amxclient_cmd(pPlayer, szCmd, szArg1, szArg2);
+	}
 }
 
 public CBasePlayer_Spawn_Pre(pPlayer) {
