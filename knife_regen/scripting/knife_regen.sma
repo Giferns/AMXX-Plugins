@@ -1,10 +1,12 @@
 /*
 	1.1 (11.08.2024 by mx?!):
 		* Fixed cvar registration for 'amx_rk_max_hp', thx @Nord1cWarr1or
+	1.2 (08.01.2025 by mx?!):
+		* Fix resetting hp to maximum value when hp is already above maximum (set by another plugin), thx @Hailsane
 */
 
 // Code based on plugin "Regen HP AP for knife" https://dev-cs.ru/resources/673/, author "I Am LeGenD"
-new const PLUGIN_VERSION[] = "1.1"
+new const PLUGIN_VERSION[] = "1.2"
 
 #include <amxmodx>
 #include <hamsandwich>
@@ -162,6 +164,7 @@ public task_Regen(pPlayer) {
 	}
 
 	new Float:fHealthValue = Float: get_entvar(pPlayer, var_health)
+	new Float:fMaxHp = GetMaxHp(pPlayer)
 	new ArmorType:iArmorType
 	new iArmorValue = rg_get_user_armor(pPlayer, iArmorType)
 
@@ -169,7 +172,10 @@ public task_Regen(pPlayer) {
 		iArmorType = ARMOR_KEVLAR
 	}
 
-	set_entvar(pPlayer, var_health, floatmin(fHealthValue + g_eCvar[CVAR_F__HEAL_AMT], GetMaxHp(pPlayer)))
+	if(fHealthValue < fMaxHp) {
+		set_entvar(pPlayer, var_health, floatmin(fHealthValue + g_eCvar[CVAR_F__HEAL_AMT], fMaxHp))
+	}
+
 	rg_set_user_armor(pPlayer, min(iArmorValue + g_eCvar[CVAR__ARMOR_AMT], g_eCvar[CVAR__MAX_ARMOR]), iArmorType)
 }
 
