@@ -5,10 +5,12 @@
 		* Fix resetting hp to maximum value when hp is already above maximum (set by another plugin), thx @Hailsane
 	1.3 (05.02.2025 by mx?!):
 		* Add GameCMS privilege access support
+	1.4 (05.02.2025 by mx?!):
+		* Add cvar 'amx_rk_access_mode` ('any of' or 'full presence' access mode by amxx flags)
 */
 
 // Code based on plugin "Regen HP AP for knife" https://dev-cs.ru/resources/673/, author "I Am LeGenD"
-new const PLUGIN_VERSION[] = "1.3"
+new const PLUGIN_VERSION[] = "1.4"
 
 #include <amxmodx>
 #include <hamsandwich>
@@ -29,6 +31,7 @@ enum _:PCVAR_ENUM {
 enum _:CVAR_ENUM {
 	CVAR__ACCESS_FLAGS,
 	CVAR__ACCESS_FLAGS_STRING[64],
+	CVAR__ACCESS_MODE,
 	CVAR__MIN_ROUND,
 	Float:CVAR_F__FREQ,
 	Float:CVAR_F__HEAL_AMT,
@@ -57,7 +60,7 @@ public plugin_init() {
 
 RegCvars() {
 	g_pCvar[PCVAR__ACCESS_FLAGS] = create_cvar( "amx_rk_access_flags", "",
-		.description = "Доступ: услуга GameCMS или флаги доступа AMXX (требуется наличие всех перечисленных)^nДля доступа для всех, задайте пустое значение"
+		.description = "Доступ: услуга GameCMS или флаги доступа AMXX^nДля доступа для всех, задайте пустое значение"
 	);
 	bind_pcvar_string(g_pCvar[PCVAR__ACCESS_FLAGS], g_eCvar[CVAR__ACCESS_FLAGS_STRING], charsmax(g_eCvar[CVAR__ACCESS_FLAGS_STRING]))
 	hook_cvar_change(g_pCvar[PCVAR__ACCESS_FLAGS], "hook_CvarChange")
@@ -65,6 +68,13 @@ RegCvars() {
 	if(g_eCvar[CVAR__ACCESS_FLAGS_STRING][0] != '_') {
 		ChangeAccessFlags(szFlags)
 	}
+	
+	bind_pcvar_num(
+		create_cvar( "amx_rk_access_mode", "0",
+			.description = "Тип доступа по флагам AMXX: 0 - наличие всех перечисленных; 1 - наличие любого из"
+		),
+		g_eCvar[CVAR__ACCESS_MODE]
+	);
 
 	bind_pcvar_num(
 		create_cvar( "amx_rk_min_round", "0",
@@ -213,7 +223,19 @@ bool:CanAccess(pPlayer) {
 		return g_bCanAccess[pPlayer]
 	}
 
-	return (!g_eCvar[CVAR__ACCESS_FLAGS] || (get_user_flags(pPlayer) & g_eCvar[CVAR__ACCESS_FLAGS]) == g_eCvar[CVAR__ACCESS_FLAGS])
+	return AmxxAccess(pPlayer)
+}
+
+bool:AmxxAccess(pPlayer) {
+	if(!g_eCvar[CVAR__ACCESS_FLAGS]) {
+		return true
+	}
+	
+	if(g_eCvar[CVAR__ACCESS_MODE]) {
+		return ( (get_user_flags(pPlayer) & g_eCvar[CVAR__ACCESS_FLAGS]) > 0 )
+	}
+	
+	return ( (get_user_flags(pPlayer) & g_eCvar[CVAR__ACCESS_FLAGS]) == g_eCvar[CVAR__ACCESS_FLAGS] )
 }
 
 public OnItemDeploy_Post(pWeapon) {
