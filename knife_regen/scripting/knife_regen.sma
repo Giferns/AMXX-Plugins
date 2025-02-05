@@ -3,10 +3,12 @@
 		* Fixed cvar registration for 'amx_rk_max_hp', thx @Nord1cWarr1or
 	1.2 (08.01.2025 by mx?!):
 		* Fix resetting hp to maximum value when hp is already above maximum (set by another plugin), thx @Hailsane
+	1.3 (05.02.2025 by mx?!):
+		* Add GameCMS privilege access support
 */
 
 // Code based on plugin "Regen HP AP for knife" https://dev-cs.ru/resources/673/, author "I Am LeGenD"
-new const PLUGIN_VERSION[] = "1.2"
+new const PLUGIN_VERSION[] = "1.3"
 
 #include <amxmodx>
 #include <hamsandwich>
@@ -16,6 +18,9 @@ new const PLUGIN_VERSION[] = "1.2"
 // Comment to disable AutoConfig option
 #define AUTO_CFG "knife_regen"
 
+// GameCMS (from gamecms5.inc)
+native Array:cmsapi_get_user_services(const index, const szAuth[] = "", const szService[] = "", serviceID = 0, bool:part = false);
+
 enum _:PCVAR_ENUM {
 	PCVAR__FREQ,
 	PCVAR__ACCESS_FLAGS
@@ -23,6 +28,7 @@ enum _:PCVAR_ENUM {
 
 enum _:CVAR_ENUM {
 	CVAR__ACCESS_FLAGS,
+	CVAR__ACCESS_FLAGS_STRING[64],
 	CVAR__MIN_ROUND,
 	Float:CVAR_F__FREQ,
 	Float:CVAR_F__HEAL_AMT,
@@ -33,6 +39,7 @@ enum _:CVAR_ENUM {
 
 new g_pCvar[PCVAR_ENUM], g_eCvar[CVAR_ENUM]
 new HamHook:g_hDeploy, HamHook:g_hHolster
+new bool:g_bCanAccess[MAX_PLAYERS + 1]
 
 public plugin_init() {
 	register_plugin("Regen HP AP for knife", PLUGIN_VERSION, "mx?!")
@@ -50,11 +57,14 @@ public plugin_init() {
 
 RegCvars() {
 	g_pCvar[PCVAR__ACCESS_FLAGS] = create_cvar( "amx_rk_access_flags", "",
-		.description = "Флаги доступа к лечению (требуется наличие всех перечисленных)^nДля доступа для всех, задайте пустое значение"
+		.description = "Доступ: услуга GameCMS или флаги доступа AMXX (требуется наличие всех перечисленных)^nДля доступа для всех, задайте пустое значение"
 	);
+	bind_pcvar_string(g_pCvar[PCVAR__ACCESS_FLAGS], g_eCvar[CVAR__ACCESS_FLAGS_STRING], charsmax(g_eCvar[CVAR__ACCESS_FLAGS_STRING]))
 	hook_cvar_change(g_pCvar[PCVAR__ACCESS_FLAGS], "hook_CvarChange")
 	new szFlags[32]; get_pcvar_string(g_pCvar[PCVAR__ACCESS_FLAGS], szFlags, charsmax(szFlags))
-	ChangeAccessFlags(szFlags)
+	if(g_eCvar[CVAR__ACCESS_FLAGS_STRING][0] != '_') {
+		ChangeAccessFlags(szFlags)
+	}
 
 	bind_pcvar_num(
 		create_cvar( "amx_rk_min_round", "0",
@@ -115,7 +125,18 @@ public hook_CvarChange(pCvar, szNewVal[], szOldVal[]) {
 	}
 
 	if(pCvar == g_pCvar[PCVAR__ACCESS_FLAGS]) {
-		ChangeAccessFlags(szNewVal)
+		if(szNewVal[0] != '_') {
+			ChangeAccessFlags(szNewVal)
+		}
+		else {
+			new pPlayers[MAX_PLAYERS], iPlCount, pPlayer
+			get_players(pPlayers, iPlCount, "h")
+			for(new i; i < iPlCount; i++) {
+				pPlayer = pPlayers[i]
+				g_bCanAccess[pPlayer] = (cmsapi_get_user_services(pPlayer, "", szNewVal, 0) != Invalid_Array)
+			}
+		}
+		
 		return
 	}
 }
@@ -187,7 +208,11 @@ Float:GetMaxHp(pPlayer) {
 	return g_eCvar[CVAR_F__MAX_HP]
 }
 
-CanAccess(pPlayer) {
+bool:CanAccess(pPlayer) {
+	if(g_eCvar[CVAR__ACCESS_FLAGS_STRING][0] == '_') {
+		return g_bCanAccess[pPlayer]
+	}
+
 	return (!g_eCvar[CVAR__ACCESS_FLAGS] || (get_user_flags(pPlayer) & g_eCvar[CVAR__ACCESS_FLAGS]) == g_eCvar[CVAR__ACCESS_FLAGS])
 }
 
@@ -209,6 +234,21 @@ public OnItemHolster_Post(pWeapon) {
 	}
 }
 
+public client_putinserver(pPlayer) {
+	if(g_eCvar[CVAR__ACCESS_FLAGS_STRING][0] == '_') {
+		g_bCanAccess[pPlayer] = (cmsapi_get_user_services(pPlayer, "", g_eCvar[CVAR__ACCESS_FLAGS_STRING], 0) != Invalid_Array)
+	}
+}
+
 public client_disconnected(pPlayer) {
+	g_bCanAccess[pPlayer] = false
 	remove_task(pPlayer)
+}
+
+public plugin_natives() {
+	set_native_filter("native_filter")
+}
+
+public native_filter(const szNativeName[], iNativeID, iTrapMode) {
+	return PLUGIN_HANDLED
 }
