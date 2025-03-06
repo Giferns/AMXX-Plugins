@@ -1,0 +1,11 @@
+[ru]
+TFI__KILLED = ^4* ^1У вас есть ^3%i ^1сек. чтобы дать инфу вашей команде.
+TFI__DEAD = ^4* ^1Время на инфу ^3истекло^1, ваша команда больше вас не слышит.
+
+[en]
+TFI__KILLED = ^4* ^1You have ^3%i ^1sec. to give info to your team.
+TFI__DEAD = ^4* ^1The time for info ^3has expired^1, your team can no longer hear you.
+
+[es]
+TFI__KILLED = ^4* ^1Tienes ^3%i ^1seg. para dar informacion a tu equipo.
+TFI__DEAD = ^4* ^1El tiempo para dar informacion ^3ha expirado^1, tu equipo ya no puede oirte.
