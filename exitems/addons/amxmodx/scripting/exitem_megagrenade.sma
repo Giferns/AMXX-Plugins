@@ -51,10 +51,13 @@
 		* Forward OnAPIPostAdminCheck() replaced by OnAPIAdminConnected()
 	1.5 (16.05.2023) by mx?!:
 		* Dupe fix
+	1.6 (16.03.2025) by mx?!:
+		* Cvar 'exitem_buy_cooldown' now also work with bying through AES
+		* Cvar 'exitem_buy_cooldown' renamed to 'exitem_mgren_buy_cooldown'
 */
 
 new const PLUGIN_NAME[] = "ExItem: MegaGrenade";
-new const PLUGIN_VERSION[] = "1.5";
+new const PLUGIN_VERSION[] = "1.6";
 
 #pragma semicolon 1
 
@@ -190,7 +193,7 @@ RegCvars() {
 		.bind = g_eCvar[CVAR__BUY_TIME]
 	);
 
-	bind_cvar_num( "exitem_buy_cooldown", "0",
+	bind_cvar_num( "exitem_mgren_buy_cooldown", "0",
 		.desc = "Для CSDM. Не давать покупать чаще одного раза каждые # секунд (0 - без ограничения)",
 		.bind = g_eCvar[CVAR__BUY_COOLDOWN]
 	);
@@ -597,16 +600,23 @@ public pointBonus_GiveMegaGrenade(pPlayer) {
 		client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "EXITEMS__ALREADY_WEAPON");
 		return false;
 	}
+	
+	new iCoolDownSecs = GetCoolDownSecs(pPlayer);
+
+	if(iCoolDownSecs) {
+		client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "EXITEMS__BUY_COOLDOWN", iCoolDownSecs);
+		return false;
+	}
 
 	if(!CheckBuyzone(pPlayer)) {
-		client_print_color(pPlayer, print_team_default, "%l", "EXITEMS__ONLY_BUYZONE");
+		client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "EXITEMS__ONLY_BUYZONE");
 		return false;
 	}
 
 	switch(g_eCvar[CVAR__BUY_TIME]) {
 		case -2: {
 			if(IsBuyTimeOver()) {
-				client_print_color(pPlayer, print_team_default, "%l", "EXITEMS__BUYTIME_OVER");
+				client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "EXITEMS__BUYTIME_OVER");
 				return false;
 			}
 		}
@@ -615,7 +625,7 @@ public pointBonus_GiveMegaGrenade(pPlayer) {
 		}
 		default: {
 			if(get_gametime() - Float:get_member_game(m_fRoundStartTime) > float(g_eCvar[CVAR__BUY_TIME])) {
-				client_print_color(pPlayer, print_team_default, "%l", "EXITEMS__BUYTIME_OVER");
+				client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "EXITEMS__BUYTIME_OVER");
 				return false;
 			}
 		}
