@@ -48,10 +48,12 @@
 		* AUTO_CFG functuion replaced by CFG_PATH
 	1.4 (08.03.2023) by mx?!:
 		* Forward OnAPIPostAdminCheck() replaced by OnAPIAdminConnected()
+	1.5 (16.03.2025) by mx?!:
+		* Cvar 'exitem_mdgl_buy_cooldown' now also work with bying through AES
 */
 
 new const PLUGIN_NAME[] = "ExItem: MegaDeagle";
-new const PLUGIN_VERSION[] = "1.4";
+new const PLUGIN_VERSION[] = "1.5";
 
 #pragma semicolon 1
 
@@ -439,16 +441,23 @@ public pointBonus_GiveMegaDeagle(pPlayer) {
 		client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "EXITEMS__ALREADY_WEAPON");
 		return false;
 	}
+	
+	new iCoolDownSecs = GetCoolDownSecs(pPlayer);
+
+	if(iCoolDownSecs) {
+		client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "EXITEMS__BUY_COOLDOWN", iCoolDownSecs);
+		return false;
+	}
 
 	if(!CheckBuyzone(pPlayer)) {
-		client_print_color(pPlayer, print_team_default, "%l", "EXITEMS__ONLY_BUYZONE");
+		client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "EXITEMS__ONLY_BUYZONE");
 		return false;
 	}
 
 	switch(g_eCvar[CVAR__BUY_TIME]) {
 		case -2: {
 			if(IsBuyTimeOver()) {
-				client_print_color(pPlayer, print_team_default, "%l", "EXITEMS__BUYTIME_OVER");
+				client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "EXITEMS__BUYTIME_OVER");
 				return false;
 			}
 		}
@@ -457,7 +466,7 @@ public pointBonus_GiveMegaDeagle(pPlayer) {
 		}
 		default: {
 			if(get_gametime() - Float:get_member_game(m_fRoundStartTime) > float(g_eCvar[CVAR__BUY_TIME])) {
-				client_print_color(pPlayer, print_team_default, "%l", "EXITEMS__BUYTIME_OVER");
+				client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "EXITEMS__BUYTIME_OVER");
 				return false;
 			}
 		}
