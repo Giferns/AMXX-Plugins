@@ -637,6 +637,8 @@ public pointBonus_GiveMegaGrenade(pPlayer) {
 		client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "AES_ANEW_CALL_PROBLEM");
 		return false;
 	}
+	
+	g_iLastBuyTime[pPlayer] = get_systime();
 
 	client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "AES_BONUS_GET_MEGAGRENADE");
 
