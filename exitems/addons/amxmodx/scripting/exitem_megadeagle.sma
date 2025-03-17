@@ -481,6 +481,8 @@ public pointBonus_GiveMegaDeagle(pPlayer) {
 
 	client_print_color(pPlayer, print_team_default, "%l %l", "AES_TAG", "AES_BONUS_GET_MEGADEAGLE");
 
+	g_iLastBuyTime[pPlayer] = get_systime();
+
 	return true;
 }
 
