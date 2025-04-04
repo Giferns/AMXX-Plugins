@@ -7,10 +7,12 @@
 		* Add GameCMS privilege access support
 	1.4 (05.02.2025 by mx?!):
 		* Add cvar 'amx_rk_access_mode` ('any of' or 'full presence' access mode by amxx flags)
+	1.5 (04.04.2025 by mx?!):
+		* Fixed wrong access/freq cvar values at first map (was wrong due to szOldVal and szNewVal placement)
 */
 
 // Code based on plugin "Regen HP AP for knife" https://dev-cs.ru/resources/673/, author "I Am LeGenD"
-new const PLUGIN_VERSION[] = "1.4"
+new const PLUGIN_VERSION[] = "1.5"
 
 #include <amxmodx>
 #include <hamsandwich>
@@ -128,7 +130,7 @@ RegCvars() {
 #endif
 }
 
-public hook_CvarChange(pCvar, szNewVal[], szOldVal[]) {
+public hook_CvarChange(pCvar, szOldVal[], szNewVal[]) {
 	if(pCvar == g_pCvar[PCVAR__FREQ]) {
 		ChangeFreq(szNewVal)
 		return
