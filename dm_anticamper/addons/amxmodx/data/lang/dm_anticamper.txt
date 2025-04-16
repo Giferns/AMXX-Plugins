@@ -1,0 +1,5 @@
+[ru]
+DMAC__STOP_CAMPING = Перестаньте кемперить!
+
+[en]
+DMAC__STOP_CAMPING = Stop camping!
