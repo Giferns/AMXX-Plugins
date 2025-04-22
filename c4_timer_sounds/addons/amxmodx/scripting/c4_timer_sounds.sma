@@ -1,7 +1,7 @@
 #include amxmodx
 #include reapi
 
-new const PLUGIN_VERSION[] = "1.1"
+new const PLUGIN_VERSION[] = "1.2"
 
 enum _:SoundsEnum {
 	SOUND__1,
@@ -45,7 +45,7 @@ public plugin_precache() {
 	precache_sound(g_szSounds[SOUND__PLANT])
 	precache_sound(g_szSounds[SOUND__EXPLODE])
 
-	for(new i = SOUND__20; i > 0; i--) {
+	for(new i = SOUND__20; i >= 0; i--) {
 		precache_generic(g_szSounds[i])
 	}
 }
