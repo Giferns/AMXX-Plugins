@@ -5,9 +5,11 @@
 		* Added check for IPs and domain names
 	0.3 (27.09.2023) by mx?!:
 		* Minor improvement
+	0.4 (01.05.2025) by mx?!:
+		* Added is_user_connected() check in OnSetClientUserInfoName_Pre()
 */
 
-new const PLUGIN_VERSION[] = "0.3"
+new const PLUGIN_VERSION[] = "0.4"
 
 //native ucc_is_client_gaged(pPlayer, &iExpTime, szGagReason[], &iGagType)
 //native is_client_gaged(pPlayer)
@@ -66,6 +68,10 @@ public OnSetClientUserInfoName_Pre(pPlayer, szInfoBuffer[], szNewName[]) {
 	if(is_user_bot(pPlayer) || is_user_hltv(pPlayer)) {
 		SetHookChainReturn(ATYPE_BOOL, true)
 		return HC_SUPERCEDE
+	}
+	
+	if(!is_user_connected(pPlayer)) {
+		return HC_CONTINUE
 	}
 
 	//new iExpTime, szGagReason[64], iGagType
