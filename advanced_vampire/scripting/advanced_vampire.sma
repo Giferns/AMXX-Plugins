@@ -1,9 +1,12 @@
 /*
 	1.0 (04.05.2025 by mx?!):
 		* First release
+	1.1 (05.05.2025 by mx?!):
+		* Bugfix
+			'iTypeSetCount < (KillTypeEnum - 1)' --------> 'iTypeSetCount < KillTypeEnum'
 */
 
-new const PLUGIN_VERSION[] = "1.0"
+new const PLUGIN_VERSION[] = "1.1"
 
 #include amxmodx
 #include amxmisc
@@ -295,7 +298,7 @@ CalculateCmsAccess(pPlayer) {
 	new eCmsAccssStoreData[CmsAccessStoreStruct], szAuthID[MAX_AUTHID_LENGTH]
 	get_user_authid(pPlayer, szAuthID, chx(szAuthID))
 
-	for(new i, iTypeSetCount, iKillType; i < g_iCmsAccessArraySize && iTypeSetCount < (KillTypeEnum - 1); i++) {
+	for(new i, iTypeSetCount, iKillType; i < g_iCmsAccessArraySize && iTypeSetCount < KillTypeEnum; i++) {
 		ArrayGetArray(g_aCmsAccessArray, i, eCmsAccssStoreData)
 
 		iKillType = eCmsAccssStoreData[CmsAccessStoreStruct__KillType]
@@ -327,7 +330,7 @@ CalculateAmxxAccess(pPlayer) {
 
 	new eAmxxAccessStoreData[AmxxAccessStoreStruct]
 
-	for(new i, iTypeSetCount, iKillType; i < g_iAmxxAccessArraySize && iTypeSetCount < (KillTypeEnum - 1); i++) {
+	for(new i, iTypeSetCount, iKillType; i < g_iAmxxAccessArraySize && iTypeSetCount < KillTypeEnum; i++) {
 		ArrayGetArray(g_aAmxxAccessArray, i, eAmxxAccessStoreData)
 
 		iKillType = eAmxxAccessStoreData[AmxxAccessStoreStruct__KillType]
