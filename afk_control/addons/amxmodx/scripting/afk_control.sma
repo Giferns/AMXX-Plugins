@@ -12,9 +12,11 @@
 /* Changelog:
 	1.0 (20.12.2022) by mx?!:
 		* First release
+	1.1 (17.05.2025) by mx?!:
+		* Added support for ECD Helper ( https://fungun.net/shop/?p=show&id=150 )
 */
 
-new const PLUGIN_VERSION[] = "1.0"
+new const PLUGIN_VERSION[] = "1.1"
 
 #include amxmodx
 #include amxmisc
@@ -26,6 +28,11 @@ new const PLUGIN_VERSION[] = "1.0"
 //
 // Создавать конфиг с кварами в 'configs/plugins', и запускать его?
 #define AUTO_CFG
+
+// Support for ECD Helper. Comment to disable.
+//
+// Поддержка плагина ECD Helper. Закомментировать для отключения.
+#define ECD_HELPER_SUPPORT
 
 // DHUD Settings https://dev-cs.ru/hud/index.html
 //
@@ -46,6 +53,17 @@ new const MENU_IDENT_STRING[] = "AfkMenu"
 
 const TASKID__RESET_SKIP = 1337
 const TASKID__DELAY_TRANSFER = 1338
+
+#if defined ECD_HELPER_SUPPORT
+	/**
+	 * Вернет 1 если игрок проходит сканирование на данный момент
+	 * Используйте этот натив в плагинах AFK, чтобы добавить проверку, и не кикать игроков
+	 *
+	 * @param player				player
+	 * @return						1 or 0
+	 */
+	native ecd_is_scanning(player);
+#endif
 
 enum _:CVAR_ENUM {
 	Float:CVAR_F__CHECK_INTERVAL,
@@ -267,6 +285,12 @@ CheckAllSpectatorsForAfk(const pPlayers[MAX_PLAYERS], iPlCount) {
 		) {
 			continue
 		}
+		
+	#if defined ECD_HELPER_SUPPORT
+		if(ecd_is_scanning(pPlayer)) {
+			continue
+		}
+	#endif
 
 		iMaxSpecTime = g_eCvar[ (get_user_flags(pPlayer) & bitSpecFlags) ? CVAR__MAX_SPEC_TIME_FLAG : CVAR__MAX_SPEC_TIME_DEFAULT ];
 
