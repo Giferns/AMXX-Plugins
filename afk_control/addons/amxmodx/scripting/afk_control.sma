@@ -14,9 +14,11 @@
 		* First release
 	1.1 (17.05.2025) by mx?!:
 		* Added support for ECD Helper ( https://fungun.net/shop/?p=show&id=150 )
+	1.2 (19.06.2025) by mx?!:
+		* ECD Helper support disabled by default
 */
 
-new const PLUGIN_VERSION[] = "1.1"
+new const PLUGIN_VERSION[] = "1.2"
 
 #include amxmodx
 #include amxmisc
@@ -32,7 +34,7 @@ new const PLUGIN_VERSION[] = "1.1"
 // Support for ECD Helper. Comment to disable.
 //
 // Поддержка плагина ECD Helper. Закомментировать для отключения.
-#define ECD_HELPER_SUPPORT
+//#define ECD_HELPER_SUPPORT
 
 // DHUD Settings https://dev-cs.ru/hud/index.html
 //
