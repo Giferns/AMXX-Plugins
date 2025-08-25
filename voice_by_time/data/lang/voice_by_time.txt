@@ -1,0 +1,7 @@
+[ru]
+VBT__CHAT_UNAVAILABLE = ^3* ^1Голосовой чат станет доступен через^3 %02d:%02d
+VBT__CHAT_ACCESS = ^4* ^1Вы получили доступ к голосовому чату!
+
+[en]
+VBT__CHAT_UNAVAILABLE = ^3* ^1Voice chat will be available in^3 %02d:%02d
+VBT__CHAT_ACCESS = ^4* ^1You have gained access to voice chat!
