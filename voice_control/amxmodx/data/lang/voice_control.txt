@@ -1,0 +1,19 @@
+[ru]
+VC__VOICE_TEXT_UNLOCK = ^4* ^1Голосовой и текстовый чат ^4разблокированы!
+VC__VOICE_UNLOCK = ^4* ^1Голосовой чат ^4разблокирован!
+VC__TEXT_UNLOCK = ^4* ^1Текстовый чат ^4разблокирован!
+VC__FRAGS_REMAINING = ^3* ^1Для общения требуется ещё ^3%i %l
+VC__FRAGS_1 = фрагов
+VC__FRAGS_2 = фраг
+VC__FRAGS_3 = фрага
+VC__NEEDED_LEVEL = ^3* ^1Для общения требуется уровень '^3%s^1' (%i), ваш уровень '^3%s^1' (%i)
+
+[en]
+VC__VOICE_TEXT_UNLOCK = ^4* ^1Voice and text chat are ^4unlocked!
+VC__VOICE_UNLOCK = ^4* ^1Voice chat is ^4unlocked!
+VC__TEXT_UNLOCK = ^4* ^1Text chat is ^4unlocked!
+VC__FRAGS_REMAINING = ^3* ^1To communicate, you need ^3%i %l
+VC__FRAGS_1 = frags
+VC__FRAGS_2 = frag
+VC__FRAGS_3 = frags
+VC__NEEDED_LEVEL = ^3* ^1To communicate, you need level '^3%s^1' (%i), your level is '^3%s^1' (%i)
