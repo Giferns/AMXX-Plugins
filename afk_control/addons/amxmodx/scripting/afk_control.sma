@@ -10,31 +10,41 @@
 */
 
 /* Changelog:
-	1.0 (20.12.2022) by mx?!:
-		* First release
-	1.1 (17.05.2025) by mx?!:
-		* Added support for ECD Helper ( https://fungun.net/shop/?p=show&id=150 )
+	1.3 (24.10.2026) by mx?!:
+		* Added cvar 'afk_reply_warn'
+		* It is now possible to set a value for AUTO_CFG define
+		* ECD_HELPER_SUPPORT is now enabled by default
+			* A native_filter has been added to handle cases where 'ecd_is_scanning' native might be missing
+		* Added API (afk_control.inc)
+			* Added forward 'AfkControl_SpecAction'
 	1.2 (19.06.2025) by mx?!:
 		* ECD Helper support disabled by default
+	1.1 (17.05.2025) by mx?!:
+		* Added support for ECD Helper ( https://fungun.net/shop/?p=show&id=150 )
+	1.0 (20.12.2022) by mx?!:
+		* First release
 */
 
-new const PLUGIN_VERSION[] = "1.2"
+new const PLUGIN_VERSION[] = "1.3"
 
 #include amxmodx
 #include amxmisc
 #include reapi
 #include xs
 #include time
+#include afk_control
 
 // Create cvar config in 'configs/plugins' and run it?
+// The value is the name of the config file (specify without .cfg); "" means default (plugin-%plugin_filename%.cfg)
 //
 // Создавать конфиг с кварами в 'configs/plugins', и запускать его?
-#define AUTO_CFG
+// Значение является именем конфига (задавайте без .cfg); "" - по умолчанию (plugin-%plugin_filename%.cfg)
+#define AUTO_CFG ""
 
 // Support for ECD Helper. Comment to disable.
 //
 // Поддержка плагина ECD Helper. Закомментировать для отключения.
-//#define ECD_HELPER_SUPPORT
+#define ECD_HELPER_SUPPORT
 
 // DHUD Settings https://dev-cs.ru/hud/index.html
 //
@@ -54,7 +64,7 @@ const MENU_KEYS = MENU_KEY_1
 new const MENU_IDENT_STRING[] = "AfkMenu"
 
 const TASKID__RESET_SKIP = 1337
-const TASKID__DELAY_TRANSFER = 1338
+const TASKID__DELAY_TRANSFER = 7331
 
 #if defined ECD_HELPER_SUPPORT
 	/**
@@ -71,6 +81,7 @@ enum _:CVAR_ENUM {
 	Float:CVAR_F__CHECK_INTERVAL,
 	Float:CVAR_F__WARN_TIME,
 	CVAR__WARN_TO_WARN,
+	CVAR__REPLY_WARN,
 	CVAR__WARNS_TO_TRANSFER_C4,
 	CVAR__C4_TRANSFER_MODE,
 	CVAR__MAX_WARNS,
@@ -90,7 +101,7 @@ enum _:CVAR_ENUM {
 new g_eCvar[CVAR_ENUM], Float:g_fConnectTime[MAX_PLAYERS + 1], Float:g_fSpecStartTime[MAX_PLAYERS + 1]
 new g_iMenuID, g_szMenu[MAX_MENU_LENGTH], g_iMaxPlayers
 new g_iTimerWarns[MAX_PLAYERS + 1], g_iKilledWarns[MAX_PLAYERS + 1], g_bitPlToSkip, g_bitChecked, bool:g_bOnGround[MAX_PLAYERS + 1]
-new g_iSpawnOrigin[MAX_PLAYERS + 1][3]
+new g_iSpawnOrigin[MAX_PLAYERS + 1][3], g_fwdSpecAction
 
 public plugin_init() {
 	register_plugin("AFK Control", PLUGIN_VERSION, "mx?!")
@@ -99,6 +110,7 @@ public plugin_init() {
 	func_RegCvars()
 
 	g_iMaxPlayers = get_maxplayers()
+	g_fwdSpecAction = CreateMultiForward("AfkControl_SpecAction", ET_STOP, FP_CELL, FP_CELL)
 
 	RegisterHookChain(RG_CBasePlayer_GetIntoGame, "CBasePlayer_GetIntoGame_Post", true)
 	RegisterHookChain(RG_CBasePlayer_Spawn, "CBasePlayer_Spawn_Pre", true)
@@ -129,6 +141,11 @@ func_RegCvars() {
 		.has_min = true, .min_val = 0.0,
 		.desc = "На каком # предупреждения за AFK отправить игроку предупреждение о наказании? (0 - не предупреждать)",
 		.bind = g_eCvar[CVAR__WARN_TO_WARN]
+	);
+	
+	bind_cvar_num( "afk_reply_warn", "0",
+		.desc = "Показывать предупреждение о наказании один раз (0) или повторять (1) ?",
+		.bind = g_eCvar[CVAR__REPLY_WARN]
 	);
 
 	bind_cvar_num( "afk_max_warns", "3",
@@ -217,7 +234,7 @@ func_RegCvars() {
 	bind_pcvar_float(get_cvar_pointer("sv_maxspeed"), g_eCvar[CVAR_F__MAXSPEED])
 
 #if defined AUTO_CFG
-	AutoExecConfig(/*.name = "PluginName"*/)
+	AutoExecConfig(.name = AUTO_CFG)
 #endif
 }
 
@@ -317,7 +334,7 @@ CheckAllSpectatorsForAfk(const pPlayers[MAX_PLAYERS], iPlCount) {
 				}
 			}
 			else {
-				if(iAfkTime < iMaxSpecTime) {
+				if(iAfkTime < iMaxSpecTime || FwdValue(pPlayer, false)) {
 					continue
 				}
 
@@ -331,9 +348,15 @@ CheckAllSpectatorsForAfk(const pPlayers[MAX_PLAYERS], iPlCount) {
 		}
 	}
 
-	if(pPlayerToKick) {
+	if(pPlayerToKick && !FwdValue(pPlayer, true)) {
 		KickPlayer(pPlayerToKick, "AFK__SPEC_AFK")
 	}
+}
+
+FwdValue(pPlayer, bool:bKickMode) {
+	new iRet
+	ExecuteForward(g_fwdSpecAction, iRet, pPlayer, bKickMode)
+	return iRet
 }
 
 public func_Menu_Handler(pPlayer, iKey) {
@@ -371,7 +394,7 @@ bool:CheckPlayerForAfk(pPlayer, Float:fGameTime) {
 		TryTransferC4(pPlayer)
 	}
 
-	if(g_eCvar[CVAR__WARN_TO_WARN] && g_iTimerWarns[pPlayer] == min(g_eCvar[CVAR__WARN_TO_WARN], g_eCvar[CVAR__MAX_WARNS] - 1)) {
+	if(ShouldNotify(pPlayer)) {
 		rg_send_audio(pPlayer, SOUND__TUTOR_MSG)
 		client_print(pPlayer, print_center, "%l", "AFK__WARN_CENTER")
 		client_print_color(pPlayer, print_team_red, "%l", "AFK__WARN_CHAT")
@@ -384,6 +407,20 @@ bool:CheckPlayerForAfk(pPlayer, Float:fGameTime) {
 	}
 
 	return false
+}
+
+bool:ShouldNotify(pPlayer) {
+	if(!g_eCvar[CVAR__WARN_TO_WARN]) {
+		return false
+	}
+	
+	new iNotifyStep = min(g_eCvar[CVAR__WARN_TO_WARN], g_eCvar[CVAR__MAX_WARNS] - 1)
+	
+	if(!g_eCvar[CVAR__REPLY_WARN]) {
+		return (g_iTimerWarns[pPlayer] == iNotifyStep)
+	}
+	
+	return (g_iTimerWarns[pPlayer] >= iNotifyStep && g_iTimerWarns[pPlayer] < g_eCvar[CVAR__MAX_WARNS])
 }
 
 KickPlayer(pPlayer, const szLangKey[]) {
@@ -618,6 +655,18 @@ public CBasePlayer_StartObserver_Post(pPlayer) {
 
 public HandleMenu_ChooseTeam_Post(pPlayer, MenuChooseTeam:iMenuSlot) {
 	g_fSpecStartTime[pPlayer] = get_gametime()
+}
+
+public plugin_natives() {
+	set_native_filter("native_filter")
+}
+
+public native_filter(const szNativeName[], iNativeID, iTrapMode) {
+	if(equal(szNativeName, "ecd_is_scanning")) {
+		return PLUGIN_HANDLED
+	}
+	
+	return PLUGIN_CONTINUE
 }
 
 stock bind_cvar_num(const cvar[], const value[], flags = FCVAR_NONE, const desc[] = "", bool:has_min = false, Float:min_val = 0.0, bool:has_max = false, Float:max_val = 0.0, &bind) {
