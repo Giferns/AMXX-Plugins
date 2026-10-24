@@ -46,9 +46,9 @@ new const PLUGIN_VERSION[] = "1.3"
 // Поддержка плагина ECD Helper. Закомментировать для отключения.
 #define ECD_HELPER_SUPPORT
 
-// DHUD Settings https://dev-cs.ru/hud/index.html
+// DHUD Settings
 //
-// DHUD Настройки https://dev-cs.ru/hud/index.html
+// DHUD Настройки
 #define DHUD_SETTINGS 0, 255, 0, -1.0, 0.3, 0, 0.0, 3.0, 0.1, 0.3
 
 #define CheckBit(%0,%1) (%0 & (1 << %1))
